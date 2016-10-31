@@ -252,8 +252,7 @@ namespace Printer
    */
    template<
       typename TupleType,
-      std::size_t N,
-      typename... Args
+      std::size_t N
    >
    struct TuplePrinter
    {
