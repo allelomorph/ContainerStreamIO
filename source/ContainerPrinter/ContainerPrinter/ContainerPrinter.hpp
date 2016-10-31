@@ -18,6 +18,9 @@ namespace Traits
    template<class...>
    using void_t = void;
 
+   /**
+   * @brief Strips constness and volatility from rvalues.
+   */
    template<typename Type>
    using unqualified_t = std::remove_cv_t<std::remove_reference_t<Type>>;
 
@@ -34,8 +37,8 @@ namespace Traits
 
    /**
    * @brief Specialization to ensure that Standard Library compatible containers that have
-   * `begin()` and an `end()` member functions, as well as the `value_type` and `iterator` typedefs
-   * are treated as printable containers.
+   * `begin()`, `end()`, and `empty()` member functions, as well as the `value_type` and
+   * `iterator` typedefs are treated as printable containers.
    */
    template<typename Type>
    struct is_printable_as_container<
@@ -43,6 +46,7 @@ namespace Traits
       void_t<
          decltype(std::declval<Type&>().begin()),
          decltype(std::declval<Type&>().end()),
+         decltype(std::declval<Type&>().empty()),
          typename Type::value_type,
          typename Type::iterator
       >
@@ -235,8 +239,72 @@ namespace Printer
       static constexpr delimiter_values<wchar_t> values = { L"<", L", ", L">" };
    };
 
+   ///**
+   //* @brief Base specialization for std::tuple<...>.
+   //*/
+   //template<
+   //   typename ContainerType,
+   //   typename TupleType,
+   //   typename CharacterType,
+   //   typename TraitsType
+   //>
+   //void PrintingHelper(
+   //   std::basic_ostream<CharacterType, TraitsType>& stream,
+   //   const std::tuple<TupleType>& container)
+   //{
+   //   stream << std::get<0>(container);
+   //}
+
+   ///**
+   //* @brief Recursive specialization for std::tuple<...>.
+   //*/
+   //template<
+   //   typename FirstTupleType,
+   //   typename... RemainingTupleTypes,
+   //   typename CharacterType,
+   //   typename TraitsType
+   //>
+   //void PrintingHelper(
+   //   std::basic_ostream<CharacterType, TraitsType>& stream,
+   //   const std::tuple<FirstTupleType, RemainingTupleTypes...>& container)
+   //{
+   //   static constexpr auto delimiters =
+   //      Printer::delimiters<std::tuple<...>, CharacterType>::values;
+
+   //   stream << std::get<0>(container) << delimiters.delimiter;
+   //   PrintingHelper(stream, container);
+   //}
+
    /**
-   *
+   * see http://stackoverflow.com/questions/6245735/pretty-print-stdtuple/6245777
+   */
+   template<
+      typename CharacterType,
+      typename TraitsType,
+      typename Tuple,
+      std::size_t... IndexSequence
+   >
+   void print_tuple_impl(
+      std::basic_ostream<CharacterType, TraitsType>& stream,
+      const Tuple& tuple,
+      std::index_sequence<IndexSequence...>)
+   {
+      static constexpr auto delimiters =
+         Printer::delimiters<std::tuple<...>, CharacterType>::values;
+
+      using swallow = int[]; // guarantees left to right order
+
+      (void) swallow {
+         0,
+         (void (stream
+            << (IndexSequence == 0 ? "" : delimiters.delimiter)
+            << std::get<IndexSequence>(tuple)), 0)...
+      };
+   }
+
+
+   /**
+   * @brief Printing specialization suitable for most container types.
    */
    template<
       typename ContainerType,
@@ -249,24 +317,26 @@ namespace Printer
    {
       static constexpr auto delimiters = Printer::delimiters<ContainerType, CharacterType>::values;
 
-      if (std::distance(std::begin(container), std::end(container)) == 0)
+      if (container.empty())
       {
          return;
       }
 
-      stream << delimiters.prefix;
+      auto begin = std::begin(container);
+      stream << delimiters.prefix << *begin;
+      std::advance(begin, 1);
 
-      std::for_each(std::begin(container), std::end(container) - 1,
-         [&stream](const auto& value)
+      std::for_each(begin, std::end(container),
+         [&stream] (const auto& value)
       {
-         stream << value << delimiters.delimiter;
+         stream << delimiters.delimiter << value;
       });
 
-      stream << container.back() << delimiters.postfix;
+      stream << delimiters.postfix;
    }
 
    /**
-   *
+   * @brief Printing specialization for std::pair<...>.
    */
    template<
       typename FirstType,
@@ -293,7 +363,8 @@ namespace Printer
    }
 
    /**
-   *
+   * @brief Main class that will print out the container with the help of various templated
+   * helper functions.
    */
    template<
       typename ContainerType,
@@ -319,7 +390,7 @@ namespace Printer
 }
 
 /**
-*
+* @brief Overload of the stream output operator for compatible containers.
 */
 template<
    typename ContainerType,

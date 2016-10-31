@@ -3,6 +3,8 @@
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "Catch.hpp"
 
+#include "ScopeExit.hpp"
+
 #include "../ContainerPrinter/ContainerPrinter.hpp"
 
 #include <algorithm>
@@ -130,17 +132,40 @@ TEST_CASE("Delimiters")
 
 TEST_CASE("Container Printing")
 {
+   std::stringstream buffer;
+   std::streambuf* oldBuffer = std::cout.rdbuf(buffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::cout.rdbuf(oldBuffer); };
+
    SECTION("Printing a std::pair<...>.")
    {
       const auto pair = std::make_pair(10, 100);
+      std::cout << pair << std::flush;
 
-      std::cout << pair << std::endl;
+      REQUIRE(buffer.str() == std::string{ "(10, 100)" });
    }
 
    SECTION("Printing a std::vector<...>.")
    {
       const std::vector<int> vector { 1, 2, 3, 4 };
+      std::cout << vector << std::flush;
 
-      std::cout << vector << std::endl;
+      REQUIRE(buffer.str() == std::string{ "[1, 2, 3, 4]" });
+   }
+
+   SECTION("Printing a std::set<...>.")
+   {
+      const std::set<int> set { 1, 2, 3, 4 };
+      std::cout << set << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "{1, 2, 3, 4}" });
+   }
+
+   SECTION("Printing a std::tuple<...>.")
+   {
+      const auto tuple = std::make_tuple(1, 2, 3);
+      std::cout << tuple << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "<1, 2, 3>" });
    }
 }
