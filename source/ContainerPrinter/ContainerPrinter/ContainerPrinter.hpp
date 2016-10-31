@@ -66,6 +66,14 @@ namespace Traits
    };
 
    /**
+   * @brief Specialization to treat std::tuple<...> as a printable container type.
+   */
+   template<typename... DataTypes>
+   struct is_printable_as_container<std::tuple<DataTypes...>> : public std::true_type
+   {
+   };
+
+   /**
    * @brief Specialization to treat arrays as printable container types.
    */
    template<
@@ -239,69 +247,75 @@ namespace Printer
       static constexpr delimiter_values<wchar_t> values = { L"<", L", ", L">" };
    };
 
-   ///**
-   //* @brief Base specialization for std::tuple<...>.
-   //*/
-   //template<
-   //   typename ContainerType,
-   //   typename TupleType,
-   //   typename CharacterType,
-   //   typename TraitsType
-   //>
-   //void PrintingHelper(
-   //   std::basic_ostream<CharacterType, TraitsType>& stream,
-   //   const std::tuple<TupleType>& container)
-   //{
-   //   stream << std::get<0>(container);
-   //}
+   /**
+   * @brief Helper template to unpack and print tuple arguments.
+   */
+   template<
+      typename TupleType,
+      std::size_t N,
+      typename... Args
+   >
+   struct TuplePrinter
+   {
+      template<
+         typename CharacterType,
+         typename TraitsType,
+         typename DelimiterValues
+      >
+      static void Print(
+         std::basic_ostream<CharacterType, TraitsType>& stream,
+         const TupleType& container,
+         const DelimiterValues& delimiters)
+      {
+         TuplePrinter<TupleType, N - 1>::Print(stream, container, delimiters);
 
-   ///**
-   //* @brief Recursive specialization for std::tuple<...>.
-   //*/
-   //template<
-   //   typename FirstTupleType,
-   //   typename... RemainingTupleTypes,
-   //   typename CharacterType,
-   //   typename TraitsType
-   //>
-   //void PrintingHelper(
-   //   std::basic_ostream<CharacterType, TraitsType>& stream,
-   //   const std::tuple<FirstTupleType, RemainingTupleTypes...>& container)
-   //{
-   //   static constexpr auto delimiters =
-   //      Printer::delimiters<std::tuple<...>, CharacterType>::values;
-
-   //   stream << std::get<0>(container) << delimiters.delimiter;
-   //   PrintingHelper(stream, container);
-   //}
+         stream
+            << delimiters.delimiter
+            << std::get<N - 1>(container);
+      }
+   };
 
    /**
-   * see http://stackoverflow.com/questions/6245735/pretty-print-stdtuple/6245777
+   * @brief Helper template to unpack and print tuple arguments.
+   */
+   template<typename TupleType>
+   struct TuplePrinter<TupleType, 1>
+   {
+      template<
+         typename CharacterType,
+         typename TraitsType,
+         typename DelimiterValues
+      >
+      static void Print(
+         std::basic_ostream<CharacterType, TraitsType>& stream,
+         const TupleType& tuple,
+         const DelimiterValues& delimiters)
+      {
+         stream << std::get<0>(tuple);
+      }
+   };
+
+   /**
+   * @brief Recursive specialization for std::tuple<...>.
+   *
+   * @see http://en.cppreference.com/w/cpp/utility/tuple/tuple_cat
    */
    template<
       typename CharacterType,
       typename TraitsType,
-      typename Tuple,
-      std::size_t... IndexSequence
+      typename... Args
    >
-   void print_tuple_impl(
+   void PrintingHelper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
-      const Tuple& tuple,
-      std::index_sequence<IndexSequence...>)
+      const std::tuple<Args...>& container)
    {
       static constexpr auto delimiters =
-         Printer::delimiters<std::tuple<...>, CharacterType>::values;
+         Printer::delimiters<Traits::unqualified_t<decltype(container)>, CharacterType>::values;
 
-      using swallow = int[]; // guarantees left to right order
-
-      (void) swallow {
-         0,
-         (void (stream
-            << (IndexSequence == 0 ? "" : delimiters.delimiter)
-            << std::get<IndexSequence>(tuple)), 0)...
-      };
+      stream << delimiters.prefix;
+      TuplePrinter<decltype(container), sizeof...(Args)>::Print(stream, container, delimiters);
+      stream << delimiters.postfix;
    }
-
 
    /**
    * @brief Printing specialization suitable for most container types.
