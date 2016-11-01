@@ -34,3 +34,7 @@
 *.suo
 *.opendb
 *.log
+
+# Release and Debug Folders
+**/Release/*
+**/Debug/*

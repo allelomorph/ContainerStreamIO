@@ -18,7 +18,7 @@ namespace
    class VectorWrapper : public std::vector<Type> { };
 }
 
-TEST_CASE("Iterable Container Detection")
+TEST_CASE("Traits")
 {
    SECTION("Detect std::vector<...> as being an iterable container type.")
    {
@@ -44,12 +44,6 @@ TEST_CASE("Iterable Container Detection")
       REQUIRE(isAContainer == true);
    }
 
-   SECTION("Detect inherited iterable container type.")
-   {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<VectorWrapper<int>>;
-      REQUIRE(isAContainer == true);
-   }
-
    SECTION("Detect std::string as a type that shouldn't be iterated over.")
    {
       constexpr auto isAContainer = Traits::is_printable_as_container_v<std::string>;
@@ -60,6 +54,12 @@ TEST_CASE("Iterable Container Detection")
    {
       constexpr auto isAContainer = Traits::is_printable_as_container_v<std::wstring>;
       REQUIRE(isAContainer == false);
+   }
+
+   SECTION("Detect inherited iterable container type.")
+   {
+      constexpr auto isAContainer = Traits::is_printable_as_container_v<VectorWrapper<int>>;
+      REQUIRE(isAContainer == true);
    }
 }
 
@@ -145,7 +145,15 @@ TEST_CASE("Container Printing")
       REQUIRE(buffer.str() == std::string{ "(10, 100)" });
    }
 
-   SECTION("Printing a std::vector<...>.")
+   SECTION("Printing an empty std::vector<...>.")
+   {
+      const std::vector<int> vector{ };
+      std::cout << vector << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "[]" });
+   }
+
+   SECTION("Printing a populated std::vector<...>.")
    {
       const std::vector<int> vector { 1, 2, 3, 4 };
       std::cout << vector << std::flush;
@@ -153,7 +161,15 @@ TEST_CASE("Container Printing")
       REQUIRE(buffer.str() == std::string{ "[1, 2, 3, 4]" });
    }
 
-   SECTION("Printing a std::set<...>.")
+   SECTION("Printing an empty std::set<...>.")
+   {
+      const std::set<int> set{ };
+      std::cout << set << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "{}" });
+   }
+
+   SECTION("Printing a populated std::set<...>.")
    {
       const std::set<int> set { 1, 2, 3, 4 };
       std::cout << set << std::flush;
@@ -161,7 +177,15 @@ TEST_CASE("Container Printing")
       REQUIRE(buffer.str() == std::string{ "{1, 2, 3, 4}" });
    }
 
-   SECTION("Printing a std::tuple<...>.")
+   SECTION("Printing an empty std::tuple<...>.")
+   {
+      const auto tuple = std::make_tuple();
+      std::cout << tuple << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "<>" });
+   }
+
+   SECTION("Printing a populated std::tuple<...>.")
    {
       const auto tuple = std::make_tuple(1, 2, 3);
       std::cout << tuple << std::flush;

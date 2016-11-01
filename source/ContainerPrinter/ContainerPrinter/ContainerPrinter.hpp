@@ -19,12 +19,6 @@ namespace Traits
    using void_t = void;
 
    /**
-   * @brief Strips constness and volatility from rvalues.
-   */
-   template<typename Type>
-   using unqualified_t = std::remove_cv_t<std::remove_reference_t<Type>>;
-
-   /**
    * Base case for the testing of STD compatible container types.
    */
    template<
@@ -38,7 +32,7 @@ namespace Traits
    /**
    * @brief Specialization to ensure that Standard Library compatible containers that have
    * `begin()`, `end()`, and `empty()` member functions, as well as the `value_type` and
-   * `iterator` typedefs are treated as printable containers.
+   * `iterator` typedefs, are treated as printable containers.
    */
    template<typename Type>
    struct is_printable_as_container<
@@ -261,7 +255,7 @@ namespace Printer
          typename TraitsType,
          typename DelimiterValues
       >
-      static void Print(
+      inline static void Print(
          std::basic_ostream<CharacterType, TraitsType>& stream,
          const TupleType& container,
          const DelimiterValues& delimiters)
@@ -275,7 +269,7 @@ namespace Printer
    };
 
    /**
-   * @brief Helper template to unpack and print tuple arguments.
+   * @brief Base case specialization for std::tuple<...> printing.
    */
    template<typename TupleType>
    struct TuplePrinter<TupleType, 1>
@@ -285,7 +279,7 @@ namespace Printer
          typename TraitsType,
          typename DelimiterValues
       >
-      static void Print(
+      inline static void Print(
          std::basic_ostream<CharacterType, TraitsType>& stream,
          const TupleType& tuple,
          const DelimiterValues& delimiters)
@@ -295,24 +289,44 @@ namespace Printer
    };
 
    /**
+   * @brief Additional specialization to handle empty std::tuple<...> objects.
+   */
+   template<typename TupleType>
+   struct TuplePrinter<TupleType, 0>
+   {
+      template<
+         typename CharacterType,
+         typename TraitsType,
+         typename DelimiterValues
+      >
+      inline static void Print(
+         std::basic_ostream<CharacterType, TraitsType>& stream,
+         const TupleType& tuple,
+         const DelimiterValues& delimiters)
+      {
+      };
+   };
+
+   /**
    * @brief Recursive specialization for std::tuple<...>.
-   *
-   * @see http://en.cppreference.com/w/cpp/utility/tuple/tuple_cat
    */
    template<
       typename CharacterType,
       typename TraitsType,
-      typename... Args
+      typename... TupleArgs
    >
-   void PrintingHelper(
+   inline static void PrintingHelper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
-      const std::tuple<Args...>& container)
+      const std::tuple<TupleArgs...>& container)
    {
       static constexpr auto delimiters =
-         Printer::delimiters<Traits::unqualified_t<decltype(container)>, CharacterType>::values;
+         Printer::delimiters<
+            std::decay_t<decltype(container)>,
+            CharacterType
+         >::values;
 
       stream << delimiters.prefix;
-      TuplePrinter<decltype(container), sizeof...(Args)>::Print(stream, container, delimiters);
+      TuplePrinter<decltype(container), sizeof...(TupleArgs)>::Print(stream, container, delimiters);
       stream << delimiters.postfix;
    }
 
@@ -324,7 +338,7 @@ namespace Printer
       typename CharacterType,
       typename TraitsType
    >
-   void PrintingHelper(
+   inline static void PrintingHelper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
       const ContainerType& container)
    {
@@ -332,6 +346,10 @@ namespace Printer
 
       if (container.empty())
       {
+         stream
+            << delimiters.prefix
+            << delimiters.postfix;
+
          return;
       }
 
@@ -357,13 +375,13 @@ namespace Printer
       typename CharacterType,
       typename TraitsType
    >
-   void PrintingHelper(
+   inline static void PrintingHelper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
       const std::pair<FirstType, SecondType>& container)
    {
       static constexpr auto delimiters =
          Printer::delimiters<
-            Traits::unqualified_t<decltype(container)>,
+            std::decay_t<decltype(container)>,
             CharacterType
          >::values;
 
