@@ -242,7 +242,7 @@ namespace Printer
    };
 
    /**
-   * @brief Helper template to unpack and print tuple arguments.
+   * @brief Recursive tuple helper template to print std::tuple<...> objects.
    */
    template<
       typename TupleType,
@@ -269,7 +269,26 @@ namespace Printer
    };
 
    /**
-   * @brief Base case specialization for std::tuple<...> printing.
+   * @brief Specialization of tuple helper to handle empty std::tuple<...> objects.
+   */
+   template<typename TupleType>
+   struct TuplePrinter<TupleType, 0>
+   {
+      template<
+         typename CharacterType,
+         typename TraitsType,
+         typename DelimiterValues
+      >
+         inline static void Print(
+            std::basic_ostream<CharacterType, TraitsType>& /*stream*/,
+            const TupleType& /*tuple*/,
+            const DelimiterValues& /*delimiters*/)
+      {
+      };
+   };
+
+   /**
+   * @brief Specialization of tuple helper for the first index of a std::tuple<...>
    */
    template<typename TupleType>
    struct TuplePrinter<TupleType, 1>
@@ -282,33 +301,14 @@ namespace Printer
       inline static void Print(
          std::basic_ostream<CharacterType, TraitsType>& stream,
          const TupleType& tuple,
-         const DelimiterValues& delimiters)
+         const DelimiterValues& /*delimiters*/)
       {
          stream << std::get<0>(tuple);
       }
    };
 
    /**
-   * @brief Additional specialization to handle empty std::tuple<...> objects.
-   */
-   template<typename TupleType>
-   struct TuplePrinter<TupleType, 0>
-   {
-      template<
-         typename CharacterType,
-         typename TraitsType,
-         typename DelimiterValues
-      >
-      inline static void Print(
-         std::basic_ostream<CharacterType, TraitsType>& stream,
-         const TupleType& tuple,
-         const DelimiterValues& delimiters)
-      {
-      };
-   };
-
-   /**
-   * @brief Recursive specialization for std::tuple<...>.
+   * @brief Specialization for non-zero indices of a std::tuple<...>.
    */
    template<
       typename CharacterType,
@@ -331,6 +331,39 @@ namespace Printer
    }
 
    /**
+   * @brief Helper function to determine if a container is empty.
+   */
+   template<typename ContainerType>
+   inline bool is_empty(const ContainerType& container)
+   {
+      return container.empty();
+   };
+
+   /**
+   * @brief Helper function to be selected for non-empty arrays.
+   */
+   template<
+      typename ArrayType,
+      std::size_t ArraySize
+   >
+   constexpr bool is_empty(const ArrayType(&)[ArraySize])
+   {
+      return false;
+   }
+
+   /**
+   * @brief Helper function to be selected for empty arrays.
+   */
+   template<
+      typename ArrayType,
+      std::size_t /*ArraySize*/
+   >
+   constexpr bool is_empty(const ArrayType(&)[0])
+   {
+      return true;
+   }
+
+   /**
    * @brief Printing specialization suitable for most container types.
    */
    template<
@@ -344,7 +377,7 @@ namespace Printer
    {
       static constexpr auto delimiters = Printer::delimiters<ContainerType, CharacterType>::values;
 
-      if (container.empty())
+      if (is_empty(container))
       {
          stream
             << delimiters.prefix

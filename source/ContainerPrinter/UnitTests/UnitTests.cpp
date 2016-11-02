@@ -137,6 +137,22 @@ TEST_CASE("Container Printing")
 
    ON_SCOPE_EXIT{ std::cout.rdbuf(oldBuffer); };
 
+   SECTION("Printing a character array")
+   {
+      const auto& array = "Hello";
+      std::cout << array << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "Hello" });
+   }
+
+   SECTION("Printing an array of ints")
+   {
+      const int array[5] = { 1, 2, 3, 4, 5 };
+      std::cout << array << std::flush;
+
+      REQUIRE(buffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
+   }
+
    SECTION("Printing a std::pair<...>.")
    {
       const auto pair = std::make_pair(10, 100);
