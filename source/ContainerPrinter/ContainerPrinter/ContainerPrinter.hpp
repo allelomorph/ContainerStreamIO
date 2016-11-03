@@ -19,7 +19,7 @@ namespace Traits
    using void_t = void;
 
    /**
-   * Base case for the testing of STD compatible container types.
+   * @brief Base case for the testing of STD compatible container types.
    */
    template<
       typename /*Type*/,
@@ -124,7 +124,7 @@ namespace Traits
 namespace Printer
 {
    /**
-   * Convenience struct to neatly wrap up all the additional characters we'll need in order to
+   * @brief Struct to neatly wrap up all the additional characters we'll need in order to
    * print out the containers.
    */
    template<typename DelimiterType>
@@ -138,7 +138,7 @@ namespace Printer
    };
 
    /**
-   *
+   * @brief Additional wrapper around the `delimiter_values` struct for added convenience.
    */
    template<
       typename /*ContainerType*/,
@@ -152,7 +152,7 @@ namespace Printer
    };
 
    /**
-   * Default narrow delimiters for any container type that isn't specialized.
+   * @brief Default narrow delimiters for any container type that isn't specialized.
    */
    template<typename ContainerType>
    struct delimiters<ContainerType, char>
@@ -163,7 +163,7 @@ namespace Printer
    };
 
    /**
-   * Default wide delimiters for any container type that isn't specialized.
+   * @brief Default wide delimiters for any container type that isn't specialized.
    */
    template<typename ContainerType>
    struct delimiters<ContainerType, wchar_t>
@@ -174,7 +174,7 @@ namespace Printer
    };
 
    /**
-   * Narrow character specialization for std::set<...>.
+   * @brief Narrow character specialization for std::set<...>.
    */
    template<
       typename Type,
@@ -187,7 +187,7 @@ namespace Printer
    };
 
    /**
-   * Wide character specialization for std::set<...>.
+   * @brief Wide character specialization for std::set<...>.
    */
    template<
       typename Type,
@@ -200,7 +200,7 @@ namespace Printer
    };
 
    /**
-   * Narrow character specialization for std::set<...>.
+   * @brief Narrow character specialization for std::set<...>.
    */
    template<
       typename Type,
@@ -213,7 +213,7 @@ namespace Printer
    };
 
    /**
-   * Wide character specialization for std::set<...>.
+   * @brief Wide character specialization for std::set<...>.
    */
    template<
       typename Type,
@@ -226,7 +226,7 @@ namespace Printer
    };
 
    /**
-   * Narrow character specialization for std::pair<...>.
+   * @brief Narrow character specialization for std::pair<...>.
    */
    template<
       typename FirstType,
@@ -238,7 +238,7 @@ namespace Printer
    };
 
    /**
-   * Wide character specialization for std::pair<...>.
+   * @brief Wide character specialization for std::pair<...>.
    */
    template<
       typename FirstType,
@@ -250,7 +250,7 @@ namespace Printer
    };
 
    /**
-   * Narrow character specialization for std::tuple<...>.
+   * @brief Narrow character specialization for std::tuple<...>.
    */
    template<typename... Types>
    struct delimiters<std::tuple<Types...>, char>
@@ -259,7 +259,7 @@ namespace Printer
    };
 
    /**
-   * Wide character specialization for std::tuple<...>.
+   * @brief Wide character specialization for std::tuple<...>.
    */
    template<typename... Types>
    struct delimiters<std::tuple<Types...>, wchar_t>
