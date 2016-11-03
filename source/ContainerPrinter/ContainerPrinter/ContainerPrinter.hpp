@@ -133,8 +133,8 @@ namespace Printer
       using type = DelimiterType;
 
       const type* prefix;
-      const type* delimiter;
-      const type* postfix;
+      const type* separator;
+      const type* suffix;
    };
 
    /**
@@ -289,7 +289,7 @@ namespace Printer
          TuplePrinter<TupleType, N - 1>::Print(stream, container, delimiters);
 
          stream
-            << delimiters.delimiter
+            << delimiters.separator
             << std::get<N - 1>(container);
       }
    };
@@ -353,7 +353,7 @@ namespace Printer
 
       stream << delimiters.prefix;
       TuplePrinter<decltype(container), sizeof...(TupleArgs)>::Print(stream, container, delimiters);
-      stream << delimiters.postfix;
+      stream << delimiters.suffix;
    }
 
    /**
@@ -407,7 +407,7 @@ namespace Printer
       {
          stream
             << delimiters.prefix
-            << delimiters.postfix;
+            << delimiters.suffix;
 
          return;
       }
@@ -419,10 +419,10 @@ namespace Printer
       std::for_each(begin, std::end(container),
          [&stream] (const auto& value)
       {
-         stream << delimiters.delimiter << value;
+         stream << delimiters.separator << value;
       });
 
-      stream << delimiters.postfix;
+      stream << delimiters.suffix;
    }
 
    /**
@@ -447,9 +447,9 @@ namespace Printer
       stream
          << delimiters.prefix
          << container.first
-         << delimiters.delimiter
+         << delimiters.separator
          << container.second
-         << delimiters.postfix;
+         << delimiters.suffix;
    }
 
    /**

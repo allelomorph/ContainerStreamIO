@@ -70,64 +70,64 @@ TEST_CASE("Delimiters")
    {
       constexpr auto delimiters = Printer::delimiters<char[], char>::values;
       REQUIRE(delimiters.prefix == "[");
-      REQUIRE(delimiters.delimiter == ", ");
-      REQUIRE(delimiters.postfix == "]");
+      REQUIRE(delimiters.separator == ", ");
+      REQUIRE(delimiters.suffix == "]");
    }
 
    SECTION("Verify wide character delimiters for a non-specialized container type.")
    {
       constexpr auto delimiters = Printer::delimiters<wchar_t[], wchar_t>::values;
       REQUIRE(delimiters.prefix == L"[");
-      REQUIRE(delimiters.delimiter == L", ");
-      REQUIRE(delimiters.postfix == L"]");
+      REQUIRE(delimiters.separator == L", ");
+      REQUIRE(delimiters.suffix == L"]");
    }
 
    SECTION("Verify narrow character delimiters for a std::set<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::set<int>, char>::values;
       REQUIRE(delimiters.prefix == "{");
-      REQUIRE(delimiters.delimiter == ", ");
-      REQUIRE(delimiters.postfix == "}");
+      REQUIRE(delimiters.separator == ", ");
+      REQUIRE(delimiters.suffix == "}");
    }
 
    SECTION("Verify wide character delimiters for a std::set<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::set<int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"{");
-      REQUIRE(delimiters.delimiter == L", ");
-      REQUIRE(delimiters.postfix == L"}");
+      REQUIRE(delimiters.separator == L", ");
+      REQUIRE(delimiters.suffix == L"}");
    }
 
    SECTION("Verify narrow character delimiters for a std::pair<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::pair<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "(");
-      REQUIRE(delimiters.delimiter == ", ");
-      REQUIRE(delimiters.postfix == ")");
+      REQUIRE(delimiters.separator == ", ");
+      REQUIRE(delimiters.suffix == ")");
    }
 
    SECTION("Verify wide character delimiters for a std::pair<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::pair<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"(");
-      REQUIRE(delimiters.delimiter == L", ");
-      REQUIRE(delimiters.postfix == L")");
+      REQUIRE(delimiters.separator == L", ");
+      REQUIRE(delimiters.suffix == L")");
    }
 
    SECTION("Verify narrow character delimiters for a std::tuple<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::tuple<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "<");
-      REQUIRE(delimiters.delimiter == ", ");
-      REQUIRE(delimiters.postfix == ">");
+      REQUIRE(delimiters.separator == ", ");
+      REQUIRE(delimiters.suffix == ">");
    }
 
    SECTION("Verify wide character delimiters for a std::tuple<...>.")
    {
       constexpr auto delimiters = Printer::delimiters<std::tuple<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"<");
-      REQUIRE(delimiters.delimiter == L", ");
-      REQUIRE(delimiters.postfix == L">");
+      REQUIRE(delimiters.separator == L", ");
+      REQUIRE(delimiters.suffix == L">");
    }
 }
 
@@ -302,6 +302,19 @@ TEST_CASE("Container Printing")
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3>" });
    }
+}
+
+TEST_CASE("Nested Containers")
+{
+   std::stringstream narrowBuffer;
+   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+
+   std::wstringstream wideBuffer;
+   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a populated std::unordered_map<...> to a narrow stream.")
    {
@@ -355,5 +368,22 @@ TEST_CASE("Container Printing")
       std::wcout << vector << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"[<1, 0.1, Hello>, <2, 0.2, World>]" });
+   }
+
+   SECTION("Printing a populated std::pair<std::vector<std::pair<std::string, std::string>>>")
+   {
+      const auto pair = std::make_pair
+      (
+         10,
+         std::vector<std::pair<std::string, std::string>>
+         { 
+            std::make_pair("Why", "Not?"),
+            std::make_pair("Someone", "Might!")
+         }
+      );
+
+      std::cout << pair << std::flush;
+
+      REQUIRE(narrowBuffer.str() == std::string{ "(10, [(Why, Not?), (Someone, Might!)])" });
    }
 }
