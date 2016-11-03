@@ -255,6 +255,22 @@ TEST_CASE("Container Printing")
       REQUIRE(wideBuffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
    }
 
+   SECTION("Printing a populated std::set<...> to a narrow stream.")
+   {
+      const std::multiset<int> multiset{ 1, 2, 3, 4 };
+      std::cout << multiset << std::flush;
+
+      REQUIRE(narrowBuffer.str() == std::string{ "{1, 2, 3, 4}" });
+   }
+
+   SECTION("Printing a populated std::set<...> to a wide stream.")
+   {
+      const std::multiset<int> multiset{ 1, 2, 3, 4 };
+      std::wcout << multiset << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
+   }
+
    SECTION("Printing an empty std::tuple<...> to a narrow stream.")
    {
       const auto tuple = std::make_tuple();

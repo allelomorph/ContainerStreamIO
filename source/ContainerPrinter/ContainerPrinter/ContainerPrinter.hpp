@@ -200,6 +200,32 @@ namespace Printer
    };
 
    /**
+   * Narrow character specialization for std::set<...>.
+   */
+   template<
+      typename Type,
+      typename ComparatorType,
+      typename AllocatorType
+   >
+      struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, char>
+   {
+      static constexpr delimiter_values<char> values = { "{", ", ", "}" };
+   };
+
+   /**
+   * Wide character specialization for std::set<...>.
+   */
+   template<
+      typename Type,
+      typename ComparatorType,
+      typename AllocatorType
+   >
+      struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, wchar_t>
+   {
+      static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
+   };
+
+   /**
    * Narrow character specialization for std::pair<...>.
    */
    template<
