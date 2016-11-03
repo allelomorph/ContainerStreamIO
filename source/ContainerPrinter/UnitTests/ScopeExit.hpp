@@ -50,7 +50,18 @@ inline ScopeExit<LambdaType> operator+(const DummyStruct&, LambdaType&& lambda)
    return ScopeExit<LambdaType>{ std::forward<LambdaType>(lambda) };
 }
 
-#define JOIN_TWO_STRINGS(str1, str2) str1 ## str2
+/**
+* Concatenate preprocessor tokens A and B without expanding macro definitions
+* (however, if invoked from a macro, macro arguments are expanded).
+*
+* @see http://stackoverflow.com/a/5256500/694056
+*/
+#define PPCAT_NX(A, B) A ## B
+
+/**
+* Concatenate preprocessor tokens A and B after macro-expanding them.
+*/
+#define PPCAT(A, B) PPCAT_NX(A, B)
 
 #define ON_SCOPE_EXIT \
-   auto JOIN_TWO_STRINGS(scope_exit_, __LINE__) = DummyStruct{ } + [=] ()
+   auto PPCAT(scope_exit_, __LINE__) = DummyStruct{ } + [=] ()

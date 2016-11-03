@@ -334,7 +334,7 @@ namespace Printer
    * @brief Helper function to determine if a container is empty.
    */
    template<typename ContainerType>
-   inline bool is_empty(const ContainerType& container)
+   inline bool IsEmpty(const ContainerType& container)
    {
       return container.empty();
    };
@@ -346,7 +346,7 @@ namespace Printer
       typename ArrayType,
       std::size_t ArraySize
    >
-   constexpr bool is_empty(const ArrayType(&)[ArraySize])
+   constexpr bool IsEmpty(const ArrayType(&)[ArraySize])
    {
       return false;
    }
@@ -358,7 +358,7 @@ namespace Printer
       typename ArrayType,
       std::size_t /*ArraySize*/
    >
-   constexpr bool is_empty(const ArrayType(&)[0])
+   constexpr bool IsEmpty(const ArrayType(&)[0])
    {
       return true;
    }
@@ -377,7 +377,7 @@ namespace Printer
    {
       static constexpr auto delimiters = Printer::delimiters<ContainerType, CharacterType>::values;
 
-      if (is_empty(container))
+      if (IsEmpty(container))
       {
          stream
             << delimiters.prefix

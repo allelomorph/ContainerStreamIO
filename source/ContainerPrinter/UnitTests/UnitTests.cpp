@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <list>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 namespace
@@ -132,80 +133,211 @@ TEST_CASE("Delimiters")
 
 TEST_CASE("Container Printing")
 {
-   std::stringstream buffer;
-   std::streambuf* oldBuffer = std::cout.rdbuf(buffer.rdbuf());
+   std::stringstream narrowBuffer;
+   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
 
-   ON_SCOPE_EXIT{ std::cout.rdbuf(oldBuffer); };
+   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
 
-   SECTION("Printing a character array")
+   std::wstringstream wideBuffer;
+   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+
+   SECTION("Printing a narrow character array.")
    {
       const auto& array = "Hello";
       std::cout << array << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "Hello" });
+      REQUIRE(narrowBuffer.str() == std::string{ "Hello" });
    }
 
-   SECTION("Printing an array of ints")
+   SECTION("Printing a wide character array.")
+   {
+      const auto& array = L"Hello";
+      std::wcout << array << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"Hello" });
+   }
+
+   SECTION("Printing an array of ints to a narrow stream.")
    {
       const int array[5] = { 1, 2, 3, 4, 5 };
       std::cout << array << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
+      REQUIRE(narrowBuffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
    }
 
-   SECTION("Printing a std::pair<...>.")
+   SECTION("Printing an array of ints to a wide stream.")
+   {
+      const int array[5] = { 1, 2, 3, 4, 5 };
+      std::wcout << array << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[1, 2, 3, 4, 5]" });
+   }
+
+   SECTION("Printing a std::pair<...> to a narrow stream.")
    {
       const auto pair = std::make_pair(10, 100);
       std::cout << pair << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "(10, 100)" });
+      REQUIRE(narrowBuffer.str() == std::string{ "(10, 100)" });
    }
 
-   SECTION("Printing an empty std::vector<...>.")
+   SECTION("Printing a std::pair<...> to a wide stream.")
+   {
+      const auto pair = std::make_pair(10, 100);
+      std::wcout << pair << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"(10, 100)" });
+   }
+
+   SECTION("Printing an empty std::vector<...> to a narrow stream.")
    {
       const std::vector<int> vector{ };
       std::cout << vector << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "[]" });
+      REQUIRE(narrowBuffer.str() == std::string{ "[]" });
    }
 
-   SECTION("Printing a populated std::vector<...>.")
+   SECTION("Printing an empty std::vector<...> to a wide stream.")
+   {
+      const std::vector<int> vector{};
+      std::wcout << vector << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[]" });
+   }
+
+   SECTION("Printing a populated std::vector<...> to a narrow stream.")
    {
       const std::vector<int> vector { 1, 2, 3, 4 };
       std::cout << vector << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "[1, 2, 3, 4]" });
+      REQUIRE(narrowBuffer.str() == std::string{ "[1, 2, 3, 4]" });
    }
 
-   SECTION("Printing an empty std::set<...>.")
+   SECTION("Printing a populated std::vector<...> to a wide stream.")
+   {
+      const std::vector<int> vector{ 1, 2, 3, 4 };
+      std::wcout << vector << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[1, 2, 3, 4]" });
+   }
+
+   SECTION("Printing an empty std::set<...> to a narrow stream.")
    {
       const std::set<int> set{ };
       std::cout << set << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "{}" });
+      REQUIRE(narrowBuffer.str() == std::string{ "{}" });
    }
 
-   SECTION("Printing a populated std::set<...>.")
+   SECTION("Printing an empty std::set<...> to a wide stream.")
+   {
+      const std::set<int> set{};
+      std::wcout << set << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"{}" });
+   }
+
+   SECTION("Printing a populated std::set<...> to a narrow stream.")
    {
       const std::set<int> set { 1, 2, 3, 4 };
       std::cout << set << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "{1, 2, 3, 4}" });
+      REQUIRE(narrowBuffer.str() == std::string{ "{1, 2, 3, 4}" });
    }
 
-   SECTION("Printing an empty std::tuple<...>.")
+   SECTION("Printing a populated std::set<...> to a wide stream.")
+   {
+      const std::set<int> set{ 1, 2, 3, 4 };
+      std::wcout << set << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
+   }
+
+   SECTION("Printing an empty std::tuple<...> to a narrow stream.")
    {
       const auto tuple = std::make_tuple();
       std::cout << tuple << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "<>" });
+      REQUIRE(narrowBuffer.str() == std::string{ "<>" });
    }
 
-   SECTION("Printing a populated std::tuple<...>.")
+   SECTION("Printing an empty std::tuple<...> to a wide stream.")
+   {
+      const auto tuple = std::make_tuple();
+      std::wcout << tuple << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"<>" });
+   }
+
+   SECTION("Printing a populated std::tuple<...> to a narrow stream.")
    {
       const auto tuple = std::make_tuple(1, 2, 3);
       std::cout << tuple << std::flush;
 
-      REQUIRE(buffer.str() == std::string{ "<1, 2, 3>" });
+      REQUIRE(narrowBuffer.str() == std::string{ "<1, 2, 3>" });
+   }
+
+   SECTION("Printing a populated std::tuple<...> to a wide stream.")
+   {
+      const auto tuple = std::make_tuple(1, 2, 3);
+      std::wcout << tuple << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3>" });
+   }
+
+   SECTION("Printing a populated std::unordered_map<...> to a narrow stream.")
+   {
+      const auto map = std::unordered_map<int, std::string>
+      {
+         { 1, "Template" },
+         { 2, "Meta" },
+         { 3, "Programming" }
+      };
+
+      std::cout << map << std::flush;
+
+      REQUIRE(narrowBuffer.str() == std::string{ "[(1, Template), (2, Meta), (3, Programming)]" });
+   }
+
+   SECTION("Printing a populated std::unordered_map<...> to a wide stream.")
+   {
+      const auto map = std::unordered_map<int, std::wstring>
+      {
+         { 1, L"Template" },
+         { 2, L"Meta" },
+         { 3, L"Programming" }
+      };
+
+      std::wcout << map << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[(1, Template), (2, Meta), (3, Programming)]" });
+   }
+
+   SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
+   {
+      const auto vector = std::vector<std::tuple<int, double, std::string>>
+      {
+         std::make_tuple(1, 0.1, "Hello"),
+         std::make_tuple(2, 0.2, "World")
+      };
+
+      std::cout << vector << std::flush;
+
+      REQUIRE(narrowBuffer.str() == std::string{ "[<1, 0.1, Hello>, <2, 0.2, World>]" });
+   }
+
+   SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
+   {
+      const auto vector = std::vector<std::tuple<int, double, std::wstring>>
+      {
+         std::make_tuple(1, 0.1, L"Hello"),
+         std::make_tuple(2, 0.2, L"World")
+      };
+
+      std::wcout << vector << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[<1, 0.1, Hello>, <2, 0.2, World>]" });
    }
 }
