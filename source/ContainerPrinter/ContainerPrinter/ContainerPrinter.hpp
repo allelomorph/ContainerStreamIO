@@ -11,9 +11,7 @@
 namespace Traits
 {
    /**
-   * @brief P.F.M
-   *
-   * @see N3911
+   * @brief A neat SFINAE trick.
    */
    template<class...>
    using void_t = void;
@@ -106,7 +104,7 @@ namespace Traits
    >
    struct is_printable_as_container<
       std::basic_string<
-      CharacterType,
+         CharacterType,
          TraitsType,
          AllocatorType
       >
@@ -200,27 +198,27 @@ namespace Printer
    };
 
    /**
-   * @brief Narrow character specialization for std::set<...>.
+   * @brief Narrow character specialization for std::multiset<...>.
    */
    template<
       typename Type,
       typename ComparatorType,
       typename AllocatorType
    >
-      struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, char>
+   struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, char>
    {
       static constexpr delimiter_values<char> values = { "{", ", ", "}" };
    };
 
    /**
-   * @brief Wide character specialization for std::set<...>.
+   * @brief Wide character specialization for std::multiset<...>.
    */
    template<
       typename Type,
       typename ComparatorType,
       typename AllocatorType
    >
-      struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, wchar_t>
+   struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, wchar_t>
    {
       static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
    };
@@ -274,19 +272,19 @@ namespace Printer
       typename TupleType,
       std::size_t N
    >
-   struct TuplePrinter
+   struct tuple_printer
    {
       template<
          typename CharacterType,
          typename TraitsType,
          typename DelimiterValues
       >
-      inline static void Print(
+      inline static void print(
          std::basic_ostream<CharacterType, TraitsType>& stream,
          const TupleType& container,
          const DelimiterValues& delimiters)
       {
-         TuplePrinter<TupleType, N - 1>::Print(stream, container, delimiters);
+         tuple_printer<TupleType, N - 1>::print(stream, container, delimiters);
 
          stream
             << delimiters.separator
@@ -298,17 +296,17 @@ namespace Printer
    * @brief Specialization of tuple helper to handle empty std::tuple<...> objects.
    */
    template<typename TupleType>
-   struct TuplePrinter<TupleType, 0>
+   struct tuple_printer<TupleType, 0>
    {
       template<
          typename CharacterType,
          typename TraitsType,
          typename DelimiterValues
       >
-         inline static void Print(
-            std::basic_ostream<CharacterType, TraitsType>& /*stream*/,
-            const TupleType& /*tuple*/,
-            const DelimiterValues& /*delimiters*/)
+      inline static void print(
+         std::basic_ostream<CharacterType, TraitsType>& /*stream*/,
+         const TupleType& /*tuple*/,
+         const DelimiterValues& /*delimiters*/)
       {
       };
    };
@@ -317,14 +315,14 @@ namespace Printer
    * @brief Specialization of tuple helper for the first index of a std::tuple<...>
    */
    template<typename TupleType>
-   struct TuplePrinter<TupleType, 1>
+   struct tuple_printer<TupleType, 1>
    {
       template<
          typename CharacterType,
          typename TraitsType,
          typename DelimiterValues
       >
-      inline static void Print(
+      inline static void print(
          std::basic_ostream<CharacterType, TraitsType>& stream,
          const TupleType& tuple,
          const DelimiterValues& /*delimiters*/)
@@ -341,7 +339,7 @@ namespace Printer
       typename TraitsType,
       typename... TupleArgs
    >
-   inline static void PrintingHelper(
+   inline static void printing_helper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
       const std::tuple<TupleArgs...>& container)
    {
@@ -352,7 +350,7 @@ namespace Printer
          >::values;
 
       stream << delimiters.prefix;
-      TuplePrinter<decltype(container), sizeof...(TupleArgs)>::Print(stream, container, delimiters);
+      tuple_printer<decltype(container), sizeof...(TupleArgs)>::print(stream, container, delimiters);
       stream << delimiters.suffix;
    }
 
@@ -360,7 +358,7 @@ namespace Printer
    * @brief Helper function to determine if a container is empty.
    */
    template<typename ContainerType>
-   inline bool IsEmpty(const ContainerType& container)
+   inline bool is_empty(const ContainerType& container)
    {
       return container.empty();
    };
@@ -372,7 +370,7 @@ namespace Printer
       typename ArrayType,
       std::size_t ArraySize
    >
-   constexpr bool IsEmpty(const ArrayType(&)[ArraySize])
+   constexpr bool is_empty(const ArrayType(&)[ArraySize])
    {
       return false;
    }
@@ -384,7 +382,7 @@ namespace Printer
       typename ArrayType,
       std::size_t /*ArraySize*/
    >
-   constexpr bool IsEmpty(const ArrayType(&)[0])
+   constexpr bool is_empty(const ArrayType(&)[0])
    {
       return true;
    }
@@ -397,13 +395,13 @@ namespace Printer
       typename CharacterType,
       typename TraitsType
    >
-   inline static void PrintingHelper(
+   inline static void printing_helper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
       const ContainerType& container)
    {
       static constexpr auto delimiters = Printer::delimiters<ContainerType, CharacterType>::values;
 
-      if (IsEmpty(container))
+      if (is_empty(container))
       {
          stream
             << delimiters.prefix
@@ -434,7 +432,7 @@ namespace Printer
       typename CharacterType,
       typename TraitsType
    >
-   inline static void PrintingHelper(
+   inline static void printing_helper(
       std::basic_ostream<CharacterType, TraitsType>& stream,
       const std::pair<FirstType, SecondType>& container)
    {
@@ -469,9 +467,9 @@ namespace Printer
       {
       }
 
-      inline void PrintTo(std::basic_ostream<CharacterType, TraitsType>& stream) const
+      inline void print_to(std::basic_ostream<CharacterType, TraitsType>& stream) const
       {
-         PrintingHelper(stream, m_container);
+         printing_helper(stream, m_container);
       }
 
    private:
@@ -492,7 +490,7 @@ auto& operator<<(
    std::basic_ostream<CharacterType, TraitsType>& stream,
    const ContainerType& container)
 {
-   Printer::ContainerPrinter<ContainerType, CharacterType, TraitsType>(container).PrintTo(stream);
+   Printer::ContainerPrinter<ContainerType, CharacterType, TraitsType>(container).print_to(stream);
 
    return stream;
 }
