@@ -17,6 +17,8 @@ By virtue of template meta-programming (TMP), the following data structures shou
 * `std::map<...>`
 * `std::unordered_map<...>`
 
-Additionally, any custom data structure that conforms to the `Iterator` concept and provides public `begin()`, `end()`, and `empty()` member functions should also work.
+Additionally, any custom data structure that conforms to the [Iterator](http://en.cppreference.com/w/cpp/concept/Iterator) concept and provides public `begin()`, `end()`, and `empty()` member functions should also work.
+
+Just include the `ContainerPrinter.hpp` header, and you should be good to go. It should also be noted that this project was developed using Visual Studio 2015 (Update 3), and as such, makes use of various language features from both `C++11` an `C++14`. 
 
 See the included unit tests for more examples.
