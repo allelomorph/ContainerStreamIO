@@ -9,7 +9,7 @@ template<typename LambdaType>
 struct ScopeExit
 {
    ScopeExit(LambdaType&& lambda) noexcept :
-   m_lambda(std::move(lambda))
+      m_lambda{ std::move(lambda) }
    {
    }
 

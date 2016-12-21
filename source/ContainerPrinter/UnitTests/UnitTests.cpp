@@ -23,43 +23,43 @@ TEST_CASE("Traits")
 {
    SECTION("Detect std::vector<...> as being an iterable container type.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<std::vector<int>>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<std::vector<int>>;
       REQUIRE(isAContainer == true);
    }
 
    SECTION("Detect std::list<...> as being an iterable container type.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<std::list<int>>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<std::list<int>>;
       REQUIRE(isAContainer == true);
    }
 
    SECTION("Detect std::set<...> as being an iterable container type.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<std::set<int>>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<std::set<int>>;
       REQUIRE(isAContainer == true);
    }
 
    SECTION("Detect array as being an iterable container type.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<int[10]>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<int[10]>;
       REQUIRE(isAContainer == true);
    }
 
    SECTION("Detect std::string as a type that shouldn't be iterated over.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<std::string>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<std::string>;
       REQUIRE(isAContainer == false);
    }
 
    SECTION("Detect std::wstring as a type that shouldn't be iterated over.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<std::wstring>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<std::wstring>;
       REQUIRE(isAContainer == false);
    }
 
    SECTION("Detect inherited iterable container type.")
    {
-      constexpr auto isAContainer = Traits::is_printable_as_container_v<VectorWrapper<int>>;
+      constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<VectorWrapper<int>>;
       REQUIRE(isAContainer == true);
    }
 }
@@ -68,7 +68,7 @@ TEST_CASE("Delimiters")
 {
    SECTION("Verify narrow character delimiters for a non-specialized container type.")
    {
-      constexpr auto delimiters = Printer::delimiters<char[], char>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<char[], char>::values;
       REQUIRE(delimiters.prefix == "[");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == "]");
@@ -76,7 +76,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a non-specialized container type.")
    {
-      constexpr auto delimiters = Printer::delimiters<wchar_t[], wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<wchar_t[], wchar_t>::values;
       REQUIRE(delimiters.prefix == L"[");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L"]");
@@ -84,7 +84,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::set<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::set<int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::set<int>, char>::values;
       REQUIRE(delimiters.prefix == "{");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == "}");
@@ -92,7 +92,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::set<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::set<int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::set<int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"{");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L"}");
@@ -100,7 +100,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::pair<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::pair<int, int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::pair<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "(");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == ")");
@@ -108,7 +108,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::pair<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::pair<int, int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::pair<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"(");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L")");
@@ -116,7 +116,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::tuple<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::tuple<int, int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::tuple<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "<");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == ">");
@@ -124,7 +124,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::tuple<...>.")
    {
-      constexpr auto delimiters = Printer::delimiters<std::tuple<int, int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::delimiters<std::tuple<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"<");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L">");
@@ -370,7 +370,7 @@ TEST_CASE("Nested Containers")
       REQUIRE(wideBuffer.str() == std::wstring{ L"[<1, 0.1, Hello>, <2, 0.2, World>]" });
    }
 
-   SECTION("Printing a populated std::pair<std::vector<std::pair<std::string, std::string>>>")
+   SECTION("Printing a populated std::pair<int, std::vector<std::pair<std::string, std::string>>>")
    {
       const auto pair = std::make_pair
       (

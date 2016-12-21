@@ -8,127 +8,129 @@
 #include <utility>
 #include <vector>
 
-namespace Traits
+namespace ContainerPrinter
 {
-   /**
-   * @brief A neat SFINAE trick.
-   */
-   template<class...>
-   using void_t = void;
-
-   /**
-   * @brief Base case for the testing of STD compatible container types.
-   */
-   template<
-      typename /*Type*/,
-      typename = void
-   >
-   struct is_printable_as_container : std::false_type
+   namespace Traits
    {
-   };
+      /**
+      * @brief A neat SFINAE trick.
+      *
+      * @see N3911
+      */
+      template<class...>
+      using void_t = void;
 
-   /**
-   * @brief Specialization to ensure that Standard Library compatible containers that have
-   * `begin()`, `end()`, and `empty()` member functions, as well as the `value_type` and
-   * `iterator` typedefs, are treated as printable containers.
-   */
-   template<typename Type>
-   struct is_printable_as_container<
-      Type,
-      void_t<
+      /**
+      * @brief Base case for the testing of STD compatible container types.
+      */
+      template<
+         typename /*Type*/,
+         typename = void
+      >
+      struct is_printable_as_container : std::false_type
+      {
+      };
+
+      /**
+      * @brief Specialization to ensure that Standard Library compatible containers that have
+      * `begin()`, `end()`, and `empty()` member functions, as well as the `value_type` and
+      * `iterator` typedefs, are treated as printable containers.
+      */
+      template<typename Type>
+      struct is_printable_as_container<
+         Type,
+         void_t<
          decltype(std::declval<Type&>().begin()),
          decltype(std::declval<Type&>().end()),
          decltype(std::declval<Type&>().empty()),
          typename Type::value_type,
          typename Type::iterator
+         >
+      > : public std::true_type
+      {
+      };
+
+      /**
+      * @brief Specialization to treat std::pair<...> as a printable container type.
+      */
+      template<
+         typename FirstType,
+         typename SecondType
       >
-   > : public std::true_type
-   {
-   };
+      struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
+      {
+      };
 
-   /**
-   * @brief Specialization to treat std::pair<...> as a printable container type.
-   */
-   template<
-      typename FirstType,
-      typename SecondType
-   >
-   struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
-   {
-   };
+      /**
+      * @brief Specialization to treat std::tuple<...> as a printable container type.
+      */
+      template<typename... DataTypes>
+      struct is_printable_as_container<std::tuple<DataTypes...>> : public std::true_type
+      {
+      };
 
-   /**
-   * @brief Specialization to treat std::tuple<...> as a printable container type.
-   */
-   template<typename... DataTypes>
-   struct is_printable_as_container<std::tuple<DataTypes...>> : public std::true_type
-   {
-   };
+      /**
+      * @brief Specialization to treat arrays as printable container types.
+      */
+      template<
+         typename ArrayType,
+         std::size_t ArraySize
+      >
+      struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
+      {
+      };
 
-   /**
-   * @brief Specialization to treat arrays as printable container types.
-   */
-   template<
-      typename ArrayType,
-      std::size_t ArraySize
-   >
-   struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
-   {
-   };
+      /**
+      * @brief Narrow character array specialization in order to ensure that we print character arrays
+      * as string and not as delimiter containers.
+      */
+      template<std::size_t ArraySize>
+      struct is_printable_as_container<char[ArraySize]> : public std::false_type
+      {
+      };
 
-   /**
-   * @brief Narrow character array specialization in order to ensure that we print character arrays
-   * as string and not as delimiter containers.
-   */
-   template<std::size_t ArraySize>
-   struct is_printable_as_container<char[ArraySize]> : public std::false_type
-   {
-   };
+      /**
+      * @brief Wide character array specialization in order to ensure that we print character arrays
+      * as string and not as delimiter containers.
+      */
+      template<std::size_t ArraySize>
+      struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
+      {
+      };
 
-   /**
-   * @brief Wide character array specialization in order to ensure that we print character arrays
-   * as string and not as delimiter containers.
-   */
-   template<std::size_t ArraySize>
-   struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
-   {
-   };
-
-   /**
-   * @brief String specialization in order to ensure that we treat strings as nothing more than strings.
-   */
-   template<
-      typename CharacterType,
-      typename TraitsType,
-      typename AllocatorType
-   >
-   struct is_printable_as_container<
-      std::basic_string<
+      /**
+      * @brief String specialization in order to ensure that we treat strings as nothing more than strings.
+      */
+      template<
+         typename CharacterType,
+         typename CharacterTraitsType,
+         typename AllocatorType
+      >
+      struct is_printable_as_container<
+         std::basic_string<
          CharacterType,
-         TraitsType,
+         CharacterTraitsType,
          AllocatorType
-      >
-   > : public std::false_type
-   {
-   };
+         >
+      > : public std::false_type
+      {
+      };
 
-   /**
-   * @brief Helper variable template.
-   */
-   template<typename Type>
-   constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
-}
+      /**
+      * @brief Helper variable template.
+      */
+      template<typename Type>
+      constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
+   }
 
-namespace Printer
-{
    /**
    * @brief Struct to neatly wrap up all the additional characters we'll need in order to
    * print out the containers.
    */
-   template<typename DelimiterType>
+   template<typename CharacterType>
    struct delimiter_values
    {
-      using type = DelimiterType;
+      using type = CharacterType;
 
       const type* prefix;
       const type* separator;
@@ -140,11 +142,11 @@ namespace Printer
    */
    template<
       typename /*ContainerType*/,
-      typename DelimiterType
+      typename CharacterType
    >
    struct delimiters
    {
-      using type = delimiter_values<DelimiterType>;
+      using type = delimiter_values<CharacterType>;
 
       static const type values;
    };
@@ -175,11 +177,11 @@ namespace Printer
    * @brief Narrow character specialization for std::set<...>.
    */
    template<
-      typename Type,
+      typename DataType,
       typename ComparatorType,
       typename AllocatorType
    >
-   struct delimiters<std::set<Type, ComparatorType, AllocatorType>, char>
+   struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
    {
       static constexpr delimiter_values<char> values = { "{", ", ", "}" };
    };
@@ -188,11 +190,11 @@ namespace Printer
    * @brief Wide character specialization for std::set<...>.
    */
    template<
-      typename Type,
+      typename DataType,
       typename ComparatorType,
       typename AllocatorType
    >
-   struct delimiters<std::set<Type, ComparatorType, AllocatorType>, wchar_t>
+   struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
    {
       static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
    };
@@ -201,11 +203,11 @@ namespace Printer
    * @brief Narrow character specialization for std::multiset<...>.
    */
    template<
-      typename Type,
+      typename DataType,
       typename ComparatorType,
       typename AllocatorType
    >
-   struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, char>
+   struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
    {
       static constexpr delimiter_values<char> values = { "{", ", ", "}" };
    };
@@ -214,11 +216,11 @@ namespace Printer
    * @brief Wide character specialization for std::multiset<...>.
    */
    template<
-      typename Type,
+      typename DataType,
       typename ComparatorType,
       typename AllocatorType
    >
-   struct delimiters<std::multiset<Type, ComparatorType, AllocatorType>, wchar_t>
+   struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
    {
       static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
    };
@@ -250,8 +252,8 @@ namespace Printer
    /**
    * @brief Narrow character specialization for std::tuple<...>.
    */
-   template<typename... Types>
-   struct delimiters<std::tuple<Types...>, char>
+   template<typename... DataType>
+   struct delimiters<std::tuple<DataType...>, char>
    {
       static constexpr delimiter_values<char> values = { "<", ", ", ">" };
    };
@@ -259,8 +261,8 @@ namespace Printer
    /**
    * @brief Wide character specialization for std::tuple<...>.
    */
-   template<typename... Types>
-   struct delimiters<std::tuple<Types...>, wchar_t>
+   template<typename... DataType>
+   struct delimiters<std::tuple<DataType...>, wchar_t>
    {
       static constexpr delimiter_values<wchar_t> values = { L"<", L", ", L">" };
    };
@@ -276,11 +278,11 @@ namespace Printer
    {
       template<
          typename CharacterType,
-         typename TraitsType,
+         typename CharacterTraitsType,
          typename DelimiterValues
       >
       inline static void print(
-         std::basic_ostream<CharacterType, TraitsType>& stream,
+         std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
          const TupleType& container,
          const DelimiterValues& delimiters)
       {
@@ -300,11 +302,11 @@ namespace Printer
    {
       template<
          typename CharacterType,
-         typename TraitsType,
+         typename CharacterTraitsType,
          typename DelimiterValues
       >
       inline static void print(
-         std::basic_ostream<CharacterType, TraitsType>& /*stream*/,
+         std::basic_ostream<CharacterType, CharacterTraitsType>& /*stream*/,
          const TupleType& /*tuple*/,
          const DelimiterValues& /*delimiters*/)
       {
@@ -319,11 +321,11 @@ namespace Printer
    {
       template<
          typename CharacterType,
-         typename TraitsType,
+         typename CharacterTraitsType,
          typename DelimiterValues
       >
       inline static void print(
-         std::basic_ostream<CharacterType, TraitsType>& stream,
+         std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
          const TupleType& tuple,
          const DelimiterValues& /*delimiters*/)
       {
@@ -336,15 +338,15 @@ namespace Printer
    */
    template<
       typename CharacterType,
-      typename TraitsType,
+      typename CharacterTraitsType,
       typename... TupleArgs
    >
    inline static void printing_helper(
-      std::basic_ostream<CharacterType, TraitsType>& stream,
+      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
       const std::tuple<TupleArgs...>& container)
    {
       static constexpr auto delimiters =
-         Printer::delimiters<
+         ContainerPrinter::delimiters<
             std::decay_t<decltype(container)>,
             CharacterType
          >::values;
@@ -392,14 +394,18 @@ namespace Printer
    */
    template<
       typename ContainerType,
-      typename CharacterType,
+      typename CharacterTraitsType,
       typename TraitsType
    >
    inline static void printing_helper(
-      std::basic_ostream<CharacterType, TraitsType>& stream,
+      std::basic_ostream<CharacterTraitsType, TraitsType>& stream,
       const ContainerType& container)
    {
-      static constexpr auto delimiters = Printer::delimiters<ContainerType, CharacterType>::values;
+      static constexpr auto delimiters =
+         ContainerPrinter::delimiters<
+            ContainerType,
+            CharacterTraitsType
+         >::values;
 
       if (is_empty(container))
       {
@@ -430,14 +436,14 @@ namespace Printer
       typename FirstType,
       typename SecondType,
       typename CharacterType,
-      typename TraitsType
+      typename CharacterTraitsType
    >
    inline static void printing_helper(
-      std::basic_ostream<CharacterType, TraitsType>& stream,
+      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
       const std::pair<FirstType, SecondType>& container)
    {
       static constexpr auto delimiters =
-         Printer::delimiters<
+         ContainerPrinter::delimiters<
             std::decay_t<decltype(container)>,
             CharacterType
          >::values;
@@ -457,17 +463,17 @@ namespace Printer
    template<
       typename ContainerType,
       typename CharacterType,
-      typename TraitsType
+      typename CharacterTraitsType
    >
-   class ContainerPrinter
+   class Printer
    {
    public:
-      ContainerPrinter(const ContainerType& container)
+      Printer(const ContainerType& container)
          : m_container{ container }
       {
       }
 
-      inline void print_to(std::basic_ostream<CharacterType, TraitsType>& stream) const
+      inline void print_to(std::basic_ostream<CharacterType, CharacterTraitsType>& stream) const
       {
          printing_helper(stream, m_container);
       }
@@ -483,14 +489,18 @@ namespace Printer
 template<
    typename ContainerType,
    typename CharacterType,
-   typename TraitsType,
-   typename = std::enable_if_t<Traits::is_printable_as_container_v<ContainerType>>
+   typename CharacterTraitsType,
+   typename = std::enable_if_t<ContainerPrinter::Traits::is_printable_as_container_v<ContainerType>>
 >
 auto& operator<<(
-   std::basic_ostream<CharacterType, TraitsType>& stream,
+   std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
    const ContainerType& container)
 {
-   Printer::ContainerPrinter<ContainerType, CharacterType, TraitsType>(container).print_to(stream);
+   ContainerPrinter::Printer<
+      ContainerType,
+      CharacterType,
+      CharacterTraitsType
+   >(container).print_to(stream);
 
    return stream;
 }
