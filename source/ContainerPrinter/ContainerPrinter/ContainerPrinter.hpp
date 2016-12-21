@@ -40,11 +40,11 @@ namespace ContainerPrinter
       struct is_printable_as_container<
          Type,
          void_t<
-         decltype(std::declval<Type&>().begin()),
-         decltype(std::declval<Type&>().end()),
-         decltype(std::declval<Type&>().empty()),
-         typename Type::value_type,
-         typename Type::iterator
+            decltype(std::declval<Type&>().begin()),
+            decltype(std::declval<Type&>().end()),
+            decltype(std::declval<Type&>().empty()),
+            typename Type::value_type,
+            typename Type::iterator
          >
       > : public std::true_type
       {
@@ -108,9 +108,9 @@ namespace ContainerPrinter
       >
       struct is_printable_as_container<
          std::basic_string<
-         CharacterType,
-         CharacterTraitsType,
-         AllocatorType
+            CharacterType,
+            CharacterTraitsType,
+            AllocatorType
          >
       > : public std::false_type
       {
@@ -272,7 +272,7 @@ namespace ContainerPrinter
    */
    template<
       typename TupleType,
-      std::size_t N
+      std::size_t Index
    >
    struct tuple_printer
    {
@@ -286,11 +286,11 @@ namespace ContainerPrinter
          const TupleType& container,
          const DelimiterValues& delimiters)
       {
-         tuple_printer<TupleType, N - 1>::print(stream, container, delimiters);
+         tuple_printer<TupleType, Index - 1>::print(stream, container, delimiters);
 
          stream
             << delimiters.separator
-            << std::get<N - 1>(container);
+            << std::get<Index - 1>(container);
       }
    };
 
