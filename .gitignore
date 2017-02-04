@@ -34,6 +34,7 @@
 *.suo
 *.opendb
 *.log
+*.vspx
 
 # Release and Debug Folders
 **/Release/*
