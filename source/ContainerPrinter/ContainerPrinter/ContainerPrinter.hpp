@@ -1,12 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <iostream>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 namespace ContainerPrinter
 {
@@ -500,7 +500,7 @@ auto& operator<<(
       ContainerType,
       CharacterType,
       CharacterTraitsType
-   >(container).print_to(stream);
+   >{ container }.print_to(stream);
 
    return stream;
 }

@@ -134,12 +134,12 @@ TEST_CASE("Delimiters")
 TEST_CASE("Container Printing")
 {
    std::stringstream narrowBuffer;
-   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+   auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
 
    ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
 
    std::wstringstream wideBuffer;
-   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+   auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
 
    ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
 
