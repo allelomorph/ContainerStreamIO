@@ -27,7 +27,7 @@ namespace
       typename CharacterType,
       typename CharacterTraitsType
    >
-   struct CustomVectorPrinter
+   struct CustomPrinter
    {
       using StreamType = std::basic_ostream<CharacterType, CharacterTraitsType>;
 
@@ -444,15 +444,15 @@ TEST_CASE("Printing with Custom Formatters")
 
    SECTION("Printing a populated std::vector<...> to a wide stream.")
    {
-      using ContainerType = std::vector<int>;
-      using CustomFormatter = CustomVectorPrinter<ContainerType, wchar_t, std::char_traits<wchar_t>>;
+      const auto container = std::vector<int>{ 1, 2, 3, 4 };
+
+      using ContainerType = std::decay_t<decltype(container)>;
+      using CustomFormatter = CustomPrinter<ContainerType, wchar_t, std::char_traits<wchar_t>>;
 
       void (*Printer)(std::wostream&, const ContainerType&) =
          &ContainerPrinter::Emit<ContainerType, wchar_t, std::char_traits<wchar_t>, CustomFormatter>;
 
-      const std::vector<int> vector{ 1, 2, 3, 4 };
-
-      Printer(std::wcout, vector);
+      Printer(std::wcout, container);
       std::wcout << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
