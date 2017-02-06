@@ -27,7 +27,7 @@ namespace ContainerPrinter
          typename /*Type*/,
          typename = void
       >
-         struct is_printable_as_container : std::false_type
+      struct is_printable_as_container : std::false_type
       {
       };
 
@@ -57,7 +57,7 @@ namespace ContainerPrinter
          typename FirstType,
          typename SecondType
       >
-         struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
+      struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
       {
       };
 
@@ -76,13 +76,13 @@ namespace ContainerPrinter
          typename ArrayType,
          std::size_t ArraySize
       >
-         struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
+      struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
       {
       };
 
       /**
-      * @brief Narrow character array specialization in order to ensure that we print character arrays
-      * as string and not as delimiter containers.
+      * @brief Narrow character array specialization in order to ensure that we print character
+      * arrays as string and not as delimiter containers.
       */
       template<std::size_t ArraySize>
       struct is_printable_as_container<char[ArraySize]> : public std::false_type
@@ -99,7 +99,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief String specialization in order to ensure that we treat strings as nothing more than strings.
+      * @brief String specialization in order to ensure that we treat strings as nothing more than
+      * strings.
       */
       template<
          typename CharacterType,
@@ -270,47 +271,42 @@ namespace ContainerPrinter
       };
    }
 
-   namespace Formatter
+   /**
+   * @brief Default container formatter that will be used to print prefix, element, separator, and
+   * suffix strings to an output stream.
+   */
+   template<
+      typename ContainerType,
+      typename StreamType
+   >
+   struct default_formatter
    {
-      /**
-      * @brief
-      */
-      template<
-         typename ContainerType,
-         typename CharacterType,
-         typename CharacterTraitsType
-      >
-      struct default_formatter
+      static constexpr auto decorators =
+         ContainerPrinter::Decorator::delimiters<ContainerType, StreamType::char_type>::values;
+
+      static void print_prefix(StreamType& stream)
       {
-         using StreamType = std::basic_ostream<CharacterType, CharacterTraitsType>;
+         stream << decorators.prefix;
+      }
 
-         static constexpr auto decorators =
-            ContainerPrinter::Decorator::delimiters<ContainerType, CharacterType>::values;
+      template<typename ElementType>
+      static void print_element(
+         StreamType& stream,
+         const ElementType& element)
+      {
+         stream << element;
+      }
 
-         static void print_prefix(StreamType& stream)
-         {
-            stream << decorators.prefix;
-         }
+      static void print_delimiter(StreamType& stream)
+      {
+         stream << decorators.separator;
+      }
 
-         template<typename ElementType>
-         static void print_element(
-            StreamType& stream,
-            const ElementType& element)
-         {
-            stream << element;
-         }
-
-         static void print_delimiter(StreamType& stream)
-         {
-            stream << decorators.separator;
-         }
-
-         static void print_suffix(StreamType& stream)
-         {
-            stream << decorators.suffix;
-         }
-      };
-   }
+      static void print_suffix(StreamType& stream)
+      {
+         stream << decorators.suffix;
+      }
+   };
 
    /**
    * @brief Helper function to determine if a container is empty.
@@ -322,19 +318,19 @@ namespace ContainerPrinter
    };
 
    /**
-   * @brief Helper function to be selected for arrays.
+   * @brief Helper function to test arrays for emptiness.
    */
    template<
       typename ArrayType,
       std::size_t ArraySize
    >
-      constexpr bool is_empty(const ArrayType(&)[ArraySize])
+   constexpr bool is_empty(const ArrayType(&)[ArraySize])
    {
-      return static_cast<bool>(ArraySize);
+      return !static_cast<bool>(ArraySize);
    }
 
    /**
-   * @brief Recursive tuple helper template to print std::tuple<...> objects.
+   * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
    */
    template<
       typename TupleType,
@@ -342,18 +338,15 @@ namespace ContainerPrinter
    >
    struct tuple_handler
    {
-      template<
-         typename CharacterType,
-         typename CharacterTraitsType
-      >
+      template<typename StreamType>
       inline static void print(
-         std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+         StreamType& stream,
          const TupleType& container)
       {
          tuple_handler<TupleType, Index - 1>::print(stream, container);
 
          static constexpr auto decorators =
-            ContainerPrinter::Decorator::delimiters<TupleType, CharacterType>::values;
+            ContainerPrinter::Decorator::delimiters<TupleType, StreamType::char_type>::values;
 
          stream
             << decorators.separator
@@ -367,17 +360,13 @@ namespace ContainerPrinter
    template<typename TupleType>
    struct tuple_handler<TupleType, 0>
    {
-      template<
-         typename CharacterType,
-         typename CharacterTraitsType
-      >
+      template<typename StreamType>
       inline static void print(
-         std::basic_ostream<CharacterType, CharacterTraitsType>& /*stream*/,
-         const TupleType& /*tuple*/)
+         StreamType& /*stream*/,
+         const TupleType& /*tuple*/) noexcept
       {
       };
    };
-
 
    /**
    * @brief Specialization of tuple helper for the first index of a std::tuple<...>
@@ -385,32 +374,31 @@ namespace ContainerPrinter
    template<typename TupleType>
    struct tuple_handler<TupleType, 1>
    {
-      template<
-         typename CharacterType,
-         typename CharacterTraitsType
-      >
-         inline static void print(
-            std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
-            const TupleType& tuple)
+      template<typename StreamType>
+      inline static void print(
+         StreamType& stream,
+         const TupleType& tuple)
       {
          stream << std::get<0>(tuple);
       }
    };
 
    /**
-   * @brief
+   * @brief Overload meant to handle std::tuple<...> objects.
+   *
+   * @todo Figure out how to add a defaultable FormatterType template parameter into the mix.
+   * Without it, it won't be possible to customize std::tuple<...>'s printing format.
    */
    template<
-      typename CharacterType,
-      typename CharacterTraitsType,
+      typename StreamType,
       typename... TupleArgs
    >
-   static void Emit(
-      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+   static void Press(
+      StreamType& stream,
       const std::tuple<TupleArgs...>& container)
    {
       using ContainerType = std::decay_t<decltype(container)>;
-      using Formatter = Formatter::default_formatter<ContainerType, CharacterType, CharacterTraitsType>;
+      using Formatter = default_formatter<ContainerType, StreamType>;
 
       Formatter::print_prefix(stream);
       tuple_handler<ContainerType, sizeof...(TupleArgs)>::print(stream, container);
@@ -418,25 +406,19 @@ namespace ContainerPrinter
    }
 
    /**
-   * @brief
+   * @brief Overload meant to handle std::pair<...> objeccts.
    */
    template<
       typename FirstType,
       typename SecondType,
-      typename CharacterType,
-      typename CharacterTraitsType,
-      typename FormatterType = Formatter::default_formatter<
-         std::pair<FirstType, SecondType>, 
-         CharacterType, 
-         CharacterTraitsType
-      >
+      typename StreamType,
+      typename FormatterType = default_formatter<std::pair<FirstType, SecondType>, StreamType>
    >
-   static void Emit(
-      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+   static void Press(
+      StreamType& stream,
       const std::pair<FirstType, SecondType>& container)
    {
-      using ContainerType = std::decay_t<decltype(container)>;
-      using Formatter = Formatter::default_formatter<ContainerType, CharacterType, CharacterTraitsType>;
+      using Formatter = FormatterType;
 
       Formatter::print_prefix(stream);
       Formatter::print_element(stream, container.first);
@@ -446,22 +428,21 @@ namespace ContainerPrinter
    }
 
    /**
-   * @brief
+   * @brief Overload meant to handle containers that support the notion of "emptiness".
    */
    template<
       typename ContainerType,
-      typename CharacterType,
-      typename CharacterTraitsType,
-      typename FormatterType = Formatter::default_formatter<ContainerType, CharacterType, CharacterTraitsType>
+      typename StreamType,
+      typename FormatterType = default_formatter<ContainerType, StreamType>
    >
-   static void Emit(
-      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+   static void Press(
+      StreamType& stream,
       const ContainerType& container)
    {
       using Formatter = FormatterType;
 
       Formatter::print_prefix(stream);
-      
+
       if (is_empty(container))
       {
          Formatter::print_suffix(stream);
@@ -474,7 +455,7 @@ namespace ContainerPrinter
       std::advance(begin, 1);
 
       std::for_each(begin, std::end(container),
-         [&stream] (const auto& element)
+         [&stream](const auto& element)
       {
          Formatter::print_delimiter(stream);
          Formatter::print_element(stream, element);
@@ -489,15 +470,14 @@ namespace ContainerPrinter
 */
 template<
    typename ContainerType,
-   typename CharacterType,
-   typename CharacterTraitsType,
+   typename StreamType,
    typename = std::enable_if_t<ContainerPrinter::Traits::is_printable_as_container_v<ContainerType>>
 >
 auto& operator<<(
-   std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+   StreamType& stream,
    const ContainerType& container)
 {
-   ContainerPrinter::Emit(stream, container);
+   ContainerPrinter::Press(stream, container);
 
    return stream;
 }

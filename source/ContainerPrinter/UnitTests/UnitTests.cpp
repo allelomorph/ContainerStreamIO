@@ -17,20 +17,16 @@
 namespace
 {
    template<typename Type>
-   class VectorWrapper : public std::vector<Type> { };
+   class VectorWrapper : public std::vector<Type> 
+   {
+   };
 
    /**
    * @brief
    */
-   template<
-      typename ContainerType,
-      typename CharacterType,
-      typename CharacterTraitsType
-   >
+   template<typename StreamType>
    struct CustomPrinter
    {
-      using StreamType = std::basic_ostream<CharacterType, CharacterTraitsType>;
-
       static void print_prefix(StreamType& stream)
       {
          stream << L"$$ ";
@@ -196,21 +192,21 @@ TEST_CASE("Printing of Raw Arrays")
       REQUIRE(wideBuffer.str() == std::wstring{ L"Hello" });
    }
 
-   //SECTION("Printing an array of ints to a narrow stream.")
-   //{
-   //   const int array[5] = { 1, 2, 3, 4, 5 };
-   //   std::cout << array << std::flush;
+   SECTION("Printing an array of ints to a narrow stream.")
+   {
+      const int array[5] = { 1, 2, 3, 4, 5 };
+      std::cout << array << std::flush;
 
-   //   REQUIRE(narrowBuffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
-   //}
+      REQUIRE(narrowBuffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
+   }
 
-   //SECTION("Printing an array of ints to a wide stream.")
-   //{
-   //   const int array[5] = { 1, 2, 3, 4, 5 };
-   //   std::wcout << array << std::flush;
+   SECTION("Printing an array of ints to a wide stream.")
+   {
+      const int array[5] = { 1, 2, 3, 4, 5 };
+      std::wcout << array << std::flush;
 
-   //   REQUIRE(wideBuffer.str() == std::wstring{ L"[1, 2, 3, 4, 5]" });
-   //}
+      REQUIRE(wideBuffer.str() == std::wstring{ L"[1, 2, 3, 4, 5]" });
+   }
 }
 
 TEST_CASE("Printing of Standard Library Containers")
@@ -418,10 +414,10 @@ TEST_CASE("Printing of Nested Containers")
       (
          10,
          std::vector<std::pair<std::string, std::string>>
-      {
-         std::make_pair("Why", "Not?"),
+         {
+            std::make_pair("Why", "Not?"),
             std::make_pair("Someone", "Might!")
-      }
+         }
       );
 
       std::cout << pair << std::flush;
@@ -447,10 +443,10 @@ TEST_CASE("Printing with Custom Formatters")
       const auto container = std::vector<int>{ 1, 2, 3, 4 };
 
       using ContainerType = std::decay_t<decltype(container)>;
-      using CustomFormatter = CustomPrinter<ContainerType, wchar_t, std::char_traits<wchar_t>>;
+      using CustomFormatter = CustomPrinter<std::wostream>;
 
       void (*Printer)(std::wostream&, const ContainerType&) =
-         &ContainerPrinter::Emit<ContainerType, wchar_t, std::char_traits<wchar_t>, CustomFormatter>;
+         &ContainerPrinter::Press<ContainerType, std::wostream, CustomFormatter>;
 
       Printer(std::wcout, container);
       std::wcout << std::flush;
