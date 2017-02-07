@@ -122,6 +122,16 @@ namespace ContainerPrinter
       */
       template<typename Type>
       constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
+
+      template<typename>
+      struct is_a_tuple : public std::false_type
+      {
+      };
+
+      template<typename... Args>
+      struct is_a_tuple<std::tuple<Args...>> : public std::true_type
+      {
+      };
    }
 
    namespace Decorator
@@ -393,7 +403,7 @@ namespace ContainerPrinter
       typename StreamType,
       typename... TupleArgs
    >
-   static void Press(
+   static void ToStream(
       StreamType& stream,
       const std::tuple<TupleArgs...>& container)
    {
@@ -409,12 +419,12 @@ namespace ContainerPrinter
    * @brief Overload meant to handle std::pair<...> objeccts.
    */
    template<
+      typename StreamType,
       typename FirstType,
       typename SecondType,
-      typename StreamType,
       typename FormatterType = default_formatter<std::pair<FirstType, SecondType>, StreamType>
    >
-   static void Press(
+   static void ToStream(
       StreamType& stream,
       const std::pair<FirstType, SecondType>& container)
    {
@@ -431,11 +441,11 @@ namespace ContainerPrinter
    * @brief Overload meant to handle containers that support the notion of "emptiness".
    */
    template<
-      typename ContainerType,
       typename StreamType,
+      typename ContainerType,
       typename FormatterType = default_formatter<ContainerType, StreamType>
    >
-   static void Press(
+   static void ToStream(
       StreamType& stream,
       const ContainerType& container)
    {
@@ -469,15 +479,15 @@ namespace ContainerPrinter
 * @brief Overload of the stream output operator for compatible containers.
 */
 template<
-   typename ContainerType,
    typename StreamType,
+   typename ContainerType,
    typename = std::enable_if_t<ContainerPrinter::Traits::is_printable_as_container_v<ContainerType>>
 >
 auto& operator<<(
    StreamType& stream,
    const ContainerType& container)
 {
-   ContainerPrinter::Press(stream, container);
+   ContainerPrinter::ToStream(stream, container);
 
    return stream;
 }

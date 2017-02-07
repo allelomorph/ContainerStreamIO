@@ -24,15 +24,18 @@ namespace
    /**
    * @brief
    */
-   template<typename StreamType>
    struct CustomPrinter
    {
+      template<typename StreamType>
       static void print_prefix(StreamType& stream)
       {
          stream << L"$$ ";
       }
 
-      template<typename ElementType>
+      template<
+         typename StreamType,
+         typename ElementType
+      >
       static void print_element(
          StreamType& stream,
          const ElementType& element)
@@ -40,11 +43,13 @@ namespace
          stream << element;
       }
 
+      template<typename StreamType>
       static void print_delimiter(StreamType& stream)
       {
          stream << L" | ";
       }
 
+      template<typename StreamType>
       static void print_suffix(StreamType& stream)
       {
          stream << L" $$";
@@ -94,6 +99,18 @@ TEST_CASE("Traits")
    {
       constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<VectorWrapper<int>>;
       REQUIRE(isAContainer == true);
+   }
+
+   SECTION("Detect std::tuple<...> instances.")
+   {
+      const auto tuple = std::make_tuple(10, 20, 30);
+      const auto vector = std::vector<int>{ 1, 2, 3 };
+
+      const auto isATuple = ContainerPrinter::Traits::is_a_tuple<std::decay_t<decltype(tuple)>>::value;
+      const auto isAlsoATuple = ContainerPrinter::Traits::is_a_tuple<std::decay_t<decltype(vector)>>::value;
+
+      REQUIRE(isATuple == true);
+      REQUIRE(isAlsoATuple == false);
    }
 }
 
@@ -441,12 +458,10 @@ TEST_CASE("Printing with Custom Formatters")
    SECTION("Printing a populated std::vector<...> to a wide stream.")
    {
       const auto container = std::vector<int>{ 1, 2, 3, 4 };
-
       using ContainerType = std::decay_t<decltype(container)>;
-      using CustomFormatter = CustomPrinter<std::wostream>;
 
       void (*Printer)(std::wostream&, const ContainerType&) =
-         &ContainerPrinter::Press<ContainerType, std::wostream, CustomFormatter>;
+         &ContainerPrinter::ToStream<std::wostream, ContainerType, CustomPrinter>;
 
       Printer(std::wcout, container);
       std::wcout << std::flush;
