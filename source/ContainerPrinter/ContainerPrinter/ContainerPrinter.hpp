@@ -124,12 +124,35 @@ namespace ContainerPrinter
       constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
 
       template<typename>
+      struct is_a_pair : public std::false_type
+      {
+      };
+
+      template<
+         typename FirstType,
+         typename SecondType
+      >
+      struct is_a_pair<std::pair<FirstType, SecondType>> : public std::true_type
+      {
+      };
+
+      template<typename>
       struct is_a_tuple : public std::false_type
       {
       };
 
       template<typename... Args>
       struct is_a_tuple<std::tuple<Args...>> : public std::true_type
+      {
+      };
+
+      template<typename>
+      struct is_not_a_tuple : public std::true_type
+      {
+      };
+
+      template<typename... Args>
+      struct is_not_a_tuple<std::tuple<Args...>> : public std::false_type
       {
       };
    }
@@ -339,38 +362,28 @@ namespace ContainerPrinter
       return !static_cast<bool>(ArraySize);
    }
 
-   /**
-   * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
-   */
-   template<
-      typename TupleType,
-      std::size_t Index
-   >
+   template<typename...>
    struct tuple_handler
    {
-      template<typename StreamType>
+      template<
+         typename StreamType,
+         typename TupleType
+      >
       inline static void print(
-         StreamType& stream,
-         const TupleType& container)
-      {
-         tuple_handler<TupleType, Index - 1>::print(stream, container);
-
-         static constexpr auto decorators =
-            ContainerPrinter::Decorator::delimiters<TupleType, StreamType::char_type>::values;
-
-         stream
-            << decorators.separator
-            << std::get<Index - 1>(container);
-      }
+         StreamType& /*stream*/,
+         const TupleType& /*tuple*/);
    };
 
    /**
    * @brief Specialization of tuple helper to handle empty std::tuple<...> objects.
    */
-   template<typename TupleType>
-   struct tuple_handler<TupleType, 0>
+   template<>
+   struct tuple_handler<std::tuple<>>
    {
-      template<typename StreamType>
+      template<
+         typename StreamType,
+         typename TupleType
+      >
       inline static void print(
          StreamType& /*stream*/,
          const TupleType& /*tuple*/) noexcept
@@ -381,15 +394,46 @@ namespace ContainerPrinter
    /**
    * @brief Specialization of tuple helper for the first index of a std::tuple<...>
    */
-   template<typename TupleType>
-   struct tuple_handler<TupleType, 1>
+   template<typename SingleArg>
+   struct tuple_handler<std::tuple<SingleArg>>
    {
-      template<typename StreamType>
+      template<
+         typename StreamType,
+         typename TupleType
+      >
       inline static void print(
          StreamType& stream,
          const TupleType& tuple)
       {
          stream << std::get<0>(tuple);
+      }
+   };
+
+   /**
+   * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
+   */
+   template<
+      typename FirstElement,
+      typename... Args
+   >
+   struct tuple_handler<std::tuple<FirstElement, Args...>>
+   {
+      template<
+         typename StreamType,
+         typename TupleType
+      >
+      inline static void print(
+         StreamType& stream,
+         const TupleType& container)
+      {
+         tuple_handler<std::tuple<Args...>>::print(stream, container);
+
+         static constexpr auto decorators =
+            ContainerPrinter::Decorator::delimiters<TupleType, StreamType::char_type>::values;
+
+         stream
+            << decorators.separator
+            << std::get<sizeof...(Args)>(container);
       }
    };
 
@@ -401,17 +445,19 @@ namespace ContainerPrinter
    */
    template<
       typename StreamType,
-      typename... TupleArgs
+      typename TupleType,
+      //typename FormatterType = default_formatter<TupleType, StreamType>,
+      typename = std::enable_if_t<Traits::is_a_tuple<TupleType>::value>
    >
    static void ToStream(
       StreamType& stream,
-      const std::tuple<TupleArgs...>& container)
+      const TupleType& container)
    {
       using ContainerType = std::decay_t<decltype(container)>;
       using Formatter = default_formatter<ContainerType, StreamType>;
 
       Formatter::print_prefix(stream);
-      tuple_handler<ContainerType, sizeof...(TupleArgs)>::print(stream, container);
+      tuple_handler<ContainerType>::print(stream, container);
       Formatter::print_suffix(stream);
    }
 
@@ -443,7 +489,8 @@ namespace ContainerPrinter
    template<
       typename StreamType,
       typename ContainerType,
-      typename FormatterType = default_formatter<ContainerType, StreamType>
+      typename FormatterType = default_formatter<ContainerType, StreamType>,
+      typename = std::enable_if_t<Traits::is_not_a_tuple<ContainerType>::value>
    >
    static void ToStream(
       StreamType& stream,

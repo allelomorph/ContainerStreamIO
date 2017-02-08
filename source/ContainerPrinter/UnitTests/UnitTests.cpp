@@ -457,15 +457,15 @@ TEST_CASE("Printing with Custom Formatters")
 
    SECTION("Printing a populated std::vector<...> to a wide stream.")
    {
-      const auto container = std::vector<int>{ 1, 2, 3, 4 };
-      using ContainerType = std::decay_t<decltype(container)>;
+      //const auto container = std::vector<int>{ 1, 2, 3, 4 };
+      //using ContainerType = std::decay_t<decltype(container)>;
 
-      void (*Printer)(std::wostream&, const ContainerType&) =
-         &ContainerPrinter::ToStream<std::wostream, ContainerType, CustomPrinter>;
+      //void (*Printer)(std::wostream&, const ContainerType&) =
+      //   &ContainerPrinter::ToStream<std::wostream, ContainerType, CustomPrinter>;
 
-      Printer(std::wcout, container);
-      std::wcout << std::flush;
+      //Printer(std::wcout, container);
+      //std::wcout << std::flush;
 
-      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+      //REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
    }
 }
