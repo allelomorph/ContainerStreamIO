@@ -145,16 +145,6 @@ namespace ContainerPrinter
       struct is_a_tuple<std::tuple<Args...>> : public std::true_type
       {
       };
-
-      template<typename>
-      struct is_not_a_tuple : public std::true_type
-      {
-      };
-
-      template<typename... Args>
-      struct is_not_a_tuple<std::tuple<Args...>> : public std::false_type
-      {
-      };
    }
 
    namespace Decorator
@@ -446,7 +436,7 @@ namespace ContainerPrinter
    template<
       typename StreamType,
       typename TupleType,
-      //typename FormatterType = default_formatter<TupleType, StreamType>,
+      //typename FormatterType = default_formatter<std::tuple<void>, StreamType>,
       typename = std::enable_if_t<Traits::is_a_tuple<TupleType>::value>
    >
    static void ToStream(
@@ -455,6 +445,8 @@ namespace ContainerPrinter
    {
       using ContainerType = std::decay_t<decltype(container)>;
       using Formatter = default_formatter<ContainerType, StreamType>;
+
+      //using Formatter = FormatterType;
 
       Formatter::print_prefix(stream);
       tuple_handler<ContainerType>::print(stream, container);
@@ -490,7 +482,7 @@ namespace ContainerPrinter
       typename StreamType,
       typename ContainerType,
       typename FormatterType = default_formatter<ContainerType, StreamType>,
-      typename = std::enable_if_t<Traits::is_not_a_tuple<ContainerType>::value>
+      typename = std::enable_if_t<std::negation<Traits::is_a_tuple<ContainerType>>::value>
    >
    static void ToStream(
       StreamType& stream,
