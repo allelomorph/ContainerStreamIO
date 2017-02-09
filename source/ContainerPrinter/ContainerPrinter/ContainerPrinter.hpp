@@ -418,7 +418,7 @@ namespace ContainerPrinter
    }
 
    /**
-   * @brief Overload meant to handle std::pair<...> objeccts.
+   * @brief Overload meant to handle std::pair<...> objects.
    */
    template<
       typename FirstType,
