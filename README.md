@@ -19,6 +19,70 @@ By virtue of generic programming, the following data structures should also work
 
 Additionally, any custom data structure that conforms to the [Iterator](http://en.cppreference.com/w/cpp/concept/Iterator) concept and provides public `begin()`, `end()`, and `empty()` member functions should also work.
 
+# Custom Formatting
+
+If you'd like to modify the prefix, delimiter, or suffix strings emitted to the output stream, or even the container elements themselves, you can provide your own custom formatter. This custom formatter should be either a `class` or `struct` with the following function signatures:
+
+* `[static] void print_prefix(StreamType&)`
+* `[static] void print_element(StreamType&, ElementType&)`
+* `[static] void print_delimiter(StreamType&)`
+* `[static] void print_suffix(StreamType&)`
+
+Any one of these functions can be static, but certainly don't have to be. In fact, you custom formatter `class` or `struct` may even be stateful.
+
+Here's an example of a very simple custom formatter (for wide character streams):
+
+```C++
+ struct CustomFormatter
+ {
+    template<typename StreamType>
+    static void print_prefix(StreamType& stream) noexcept
+    {
+       stream << L"$$ ";
+    }
+
+    template<
+       typename StreamType,
+       typename ElementType
+    >
+    static void print_element(
+       StreamType& stream,
+       const ElementType& element) noexcept
+    {
+       stream << element;
+    }
+
+    template<typename StreamType>
+    static void print_delimiter(StreamType& stream) noexcept
+    {
+       stream << L" | ";
+    }
+
+    template<typename StreamType>
+    static void print_suffix(StreamType& stream) noexcept
+    {
+       stream << L" $$";
+    }
+ };
+```
+And here is an example of how that formatter might be used (taken from `UnitTests.cpp`):
+
+```C++
+ SECTION("Printing a populated std::vector<...> to a wide stream.")
+ {
+    const auto container = std::vector<int>{ 1, 2, 3, 4 };
+
+    ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+    std::wcout << std::flush;
+
+    REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+ }
+```
+
+Note that by templating the individual functions on the `CustomFormatter`, instead of the `struct` as a whole, we can allow the compiler to deduce all the necessary template arguments for us at the call-site, thereby allowing us to write cleaner code.
+
+# Usage
+
 Just include the `ContainerPrinter.hpp` header, and you should be good to go. It should also be noted that this project was developed using Visual Studio 2015 (Update 3), and as such, makes use of various language features from both `C++11` and `C++14` which older compilers may not fully support. 
 
 See the included unit tests for more examples.
