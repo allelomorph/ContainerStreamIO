@@ -22,12 +22,12 @@ namespace
    };
 
    /**
-   * @brief
+   * @brief Custom formatting struct.
    */
-   struct CustomPrinter
+   struct CustomFormatter
    {
       template<typename StreamType>
-      static void print_prefix(StreamType& stream)
+      void print_prefix(StreamType& stream) noexcept
       {
          stream << L"$$ ";
       }
@@ -36,21 +36,21 @@ namespace
          typename StreamType,
          typename ElementType
       >
-      static void print_element(
+      void print_element(
          StreamType& stream,
-         const ElementType& element)
+         const ElementType& element) noexcept
       {
          stream << element;
       }
 
       template<typename StreamType>
-      static void print_delimiter(StreamType& stream)
+      void print_delimiter(StreamType& stream) noexcept
       {
          stream << L" | ";
       }
 
       template<typename StreamType>
-      static void print_suffix(StreamType& stream)
+      void print_suffix(StreamType& stream) noexcept
       {
          stream << L" $$";
       }
@@ -99,18 +99,6 @@ TEST_CASE("Traits")
    {
       constexpr auto isAContainer = ContainerPrinter::Traits::is_printable_as_container_v<VectorWrapper<int>>;
       REQUIRE(isAContainer == true);
-   }
-
-   SECTION("Detect std::tuple<...> instances.")
-   {
-      const auto tuple = std::make_tuple(10, 20, 30);
-      const auto vector = std::vector<int>{ 1, 2, 3 };
-
-      const auto isATuple = ContainerPrinter::Traits::is_a_tuple<std::decay_t<decltype(tuple)>>::value;
-      const auto isAlsoATuple = ContainerPrinter::Traits::is_a_tuple<std::decay_t<decltype(vector)>>::value;
-
-      REQUIRE(isATuple == true);
-      REQUIRE(isAlsoATuple == false);
    }
 }
 
@@ -344,18 +332,18 @@ TEST_CASE("Printing of Standard Library Containers")
 
    SECTION("Printing a populated std::tuple<...> to a narrow stream.")
    {
-      const auto tuple = std::make_tuple(1, 2, 3);
+      const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
       std::cout << tuple << std::flush;
 
-      REQUIRE(narrowBuffer.str() == std::string{ "<1, 2, 3>" });
+      REQUIRE(narrowBuffer.str() == std::string{ "<1, 2, 3, 4, 5>" });
    }
 
    SECTION("Printing a populated std::tuple<...> to a wide stream.")
    {
-      const auto tuple = std::make_tuple(1, 2, 3);
+      const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
       std::wcout << tuple << std::flush;
 
-      REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3>" });
+      REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3, 4, 5>" });
    }
 }
 
@@ -458,14 +446,30 @@ TEST_CASE("Printing with Custom Formatters")
    SECTION("Printing a populated std::vector<...> to a wide stream.")
    {
       const auto container = std::vector<int>{ 1, 2, 3, 4 };
-      using ContainerType = std::decay_t<decltype(container)>;
 
-      void (*Printer)(std::wostream&, const ContainerType&) =
-         &ContainerPrinter::ToStream<std::wostream, ContainerType, CustomPrinter, void>;
-
-      Printer(std::wcout, container);
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
       std::wcout << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+   }
+
+   SECTION("Printing a populated std::tuple<...> to a wide stream.")
+   {
+      const auto container = std::make_tuple( 1, 2, 3, 4 );
+
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+      std::wcout << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+   }
+
+   SECTION("Printing a populated std::pair<...> to a wide stream.")
+   {
+      const auto container = std::make_pair(1, 2);
+
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+      std::wcout << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 $$" });
    }
 }
