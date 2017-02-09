@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <list>
+#include <functional>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -16,7 +17,44 @@
 namespace
 {
    template<typename Type>
-   class VectorWrapper : public std::vector<Type> { };
+   class VectorWrapper : public std::vector<Type> 
+   {
+   };
+
+   /**
+   * @brief Custom formatting struct.
+   */
+   struct CustomFormatter
+   {
+      template<typename StreamType>
+      void print_prefix(StreamType& stream) noexcept
+      {
+         stream << L"$$ ";
+      }
+
+      template<
+         typename StreamType,
+         typename ElementType
+      >
+      void print_element(
+         StreamType& stream,
+         const ElementType& element) noexcept
+      {
+         stream << element;
+      }
+
+      template<typename StreamType>
+      void print_delimiter(StreamType& stream) noexcept
+      {
+         stream << L" | ";
+      }
+
+      template<typename StreamType>
+      void print_suffix(StreamType& stream) noexcept
+      {
+         stream << L" $$";
+      }
+   };
 }
 
 TEST_CASE("Traits")
@@ -64,11 +102,11 @@ TEST_CASE("Traits")
    }
 }
 
-TEST_CASE("Delimiters")
+TEST_CASE("Delimiter Validation")
 {
    SECTION("Verify narrow character delimiters for a non-specialized container type.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<char[], char>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<char[], char>::values;
       REQUIRE(delimiters.prefix == "[");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == "]");
@@ -76,7 +114,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a non-specialized container type.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<wchar_t[], wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<wchar_t[], wchar_t>::values;
       REQUIRE(delimiters.prefix == L"[");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L"]");
@@ -84,7 +122,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::set<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::set<int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::set<int>, char>::values;
       REQUIRE(delimiters.prefix == "{");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == "}");
@@ -92,7 +130,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::set<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::set<int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::set<int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"{");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L"}");
@@ -100,7 +138,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::pair<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::pair<int, int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::pair<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "(");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == ")");
@@ -108,7 +146,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::pair<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::pair<int, int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::pair<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"(");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L")");
@@ -116,7 +154,7 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify narrow character delimiters for a std::tuple<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::tuple<int, int>, char>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::tuple<int, int>, char>::values;
       REQUIRE(delimiters.prefix == "<");
       REQUIRE(delimiters.separator == ", ");
       REQUIRE(delimiters.suffix == ">");
@@ -124,14 +162,14 @@ TEST_CASE("Delimiters")
 
    SECTION("Verify wide character delimiters for a std::tuple<...>.")
    {
-      constexpr auto delimiters = ContainerPrinter::delimiters<std::tuple<int, int>, wchar_t>::values;
+      constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
       REQUIRE(delimiters.prefix == L"<");
       REQUIRE(delimiters.separator == L", ");
       REQUIRE(delimiters.suffix == L">");
    }
 }
 
-TEST_CASE("Container Printing")
+TEST_CASE("Printing of Raw Arrays")
 {
    std::stringstream narrowBuffer;
    auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
@@ -174,6 +212,19 @@ TEST_CASE("Container Printing")
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"[1, 2, 3, 4, 5]" });
    }
+}
+
+TEST_CASE("Printing of Standard Library Containers")
+{
+   std::stringstream narrowBuffer;
+   auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+
+   std::wstringstream wideBuffer;
+   auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a std::pair<...> to a narrow stream.")
    {
@@ -191,14 +242,6 @@ TEST_CASE("Container Printing")
       REQUIRE(wideBuffer.str() == std::wstring{ L"(10, 100)" });
    }
 
-   SECTION("Printing an empty std::vector<...> to a narrow stream.")
-   {
-      const std::vector<int> vector{ };
-      std::cout << vector << std::flush;
-
-      REQUIRE(narrowBuffer.str() == std::string{ "[]" });
-   }
-
    SECTION("Printing an empty std::vector<...> to a wide stream.")
    {
       const std::vector<int> vector{};
@@ -209,7 +252,7 @@ TEST_CASE("Container Printing")
 
    SECTION("Printing a populated std::vector<...> to a narrow stream.")
    {
-      const std::vector<int> vector { 1, 2, 3, 4 };
+      const std::vector<int> vector{ 1, 2, 3, 4 };
       std::cout << vector << std::flush;
 
       REQUIRE(narrowBuffer.str() == std::string{ "[1, 2, 3, 4]" });
@@ -225,7 +268,7 @@ TEST_CASE("Container Printing")
 
    SECTION("Printing an empty std::set<...> to a narrow stream.")
    {
-      const std::set<int> set{ };
+      const std::set<int> set{};
       std::cout << set << std::flush;
 
       REQUIRE(narrowBuffer.str() == std::string{ "{}" });
@@ -241,7 +284,7 @@ TEST_CASE("Container Printing")
 
    SECTION("Printing a populated std::set<...> to a narrow stream.")
    {
-      const std::set<int> set { 1, 2, 3, 4 };
+      const std::set<int> set{ 1, 2, 3, 4 };
       std::cout << set << std::flush;
 
       REQUIRE(narrowBuffer.str() == std::string{ "{1, 2, 3, 4}" });
@@ -255,7 +298,7 @@ TEST_CASE("Container Printing")
       REQUIRE(wideBuffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
    }
 
-   SECTION("Printing a populated std::set<...> to a narrow stream.")
+   SECTION("Printing a populated std::multiset<...> to a narrow stream.")
    {
       const std::multiset<int> multiset{ 1, 2, 3, 4 };
       std::cout << multiset << std::flush;
@@ -263,7 +306,7 @@ TEST_CASE("Container Printing")
       REQUIRE(narrowBuffer.str() == std::string{ "{1, 2, 3, 4}" });
    }
 
-   SECTION("Printing a populated std::set<...> to a wide stream.")
+   SECTION("Printing a populated std::multiset<...> to a wide stream.")
    {
       const std::multiset<int> multiset{ 1, 2, 3, 4 };
       std::wcout << multiset << std::flush;
@@ -289,22 +332,22 @@ TEST_CASE("Container Printing")
 
    SECTION("Printing a populated std::tuple<...> to a narrow stream.")
    {
-      const auto tuple = std::make_tuple(1, 2, 3);
+      const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
       std::cout << tuple << std::flush;
 
-      REQUIRE(narrowBuffer.str() == std::string{ "<1, 2, 3>" });
+      REQUIRE(narrowBuffer.str() == std::string{ "<1, 2, 3, 4, 5>" });
    }
 
    SECTION("Printing a populated std::tuple<...> to a wide stream.")
    {
-      const auto tuple = std::make_tuple(1, 2, 3);
+      const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
       std::wcout << tuple << std::flush;
 
-      REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3>" });
+      REQUIRE(wideBuffer.str() == std::wstring{ L"<1, 2, 3, 4, 5>" });
    }
 }
 
-TEST_CASE("Nested Containers")
+TEST_CASE("Printing of Nested Containers")
 {
    std::stringstream narrowBuffer;
    std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
@@ -376,7 +419,7 @@ TEST_CASE("Nested Containers")
       (
          10,
          std::vector<std::pair<std::string, std::string>>
-         { 
+         {
             std::make_pair("Why", "Not?"),
             std::make_pair("Someone", "Might!")
          }
@@ -385,5 +428,48 @@ TEST_CASE("Nested Containers")
       std::cout << pair << std::flush;
 
       REQUIRE(narrowBuffer.str() == std::string{ "(10, [(Why, Not?), (Someone, Might!)])" });
+   }
+}
+
+TEST_CASE("Printing with Custom Formatters")
+{
+   std::stringstream narrowBuffer;
+   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+
+   std::wstringstream wideBuffer;
+   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+
+   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+
+   SECTION("Printing a populated std::vector<...> to a wide stream.")
+   {
+      const auto container = std::vector<int>{ 1, 2, 3, 4 };
+
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+      std::wcout << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+   }
+
+   SECTION("Printing a populated std::tuple<...> to a wide stream.")
+   {
+      const auto container = std::make_tuple( 1, 2, 3, 4 );
+
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+      std::wcout << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+   }
+
+   SECTION("Printing a populated std::pair<...> to a wide stream.")
+   {
+      const auto container = std::make_pair(1, 2);
+
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
+      std::wcout << std::flush;
+
+      REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 $$" });
    }
 }

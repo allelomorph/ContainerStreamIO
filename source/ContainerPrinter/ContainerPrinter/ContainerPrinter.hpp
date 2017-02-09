@@ -27,14 +27,13 @@ namespace ContainerPrinter
          typename /*Type*/,
          typename = void
       >
-      struct is_printable_as_container : std::false_type
+      struct is_printable_as_container : public std::false_type
       {
       };
 
       /**
       * @brief Specialization to ensure that Standard Library compatible containers that have
-      * `begin()`, `end()`, and `empty()` member functions, as well as the `value_type` and
-      * `iterator` typedefs, are treated as printable containers.
+      * `begin()`, `end()`, and `empty()` member functions are treated as printable containers.
       */
       template<typename Type>
       struct is_printable_as_container<
@@ -42,9 +41,7 @@ namespace ContainerPrinter
          void_t<
             decltype(std::declval<Type&>().begin()),
             decltype(std::declval<Type&>().end()),
-            decltype(std::declval<Type&>().empty()),
-            typename Type::value_type,
-            typename Type::iterator
+            decltype(std::declval<Type&>().empty())
          >
       > : public std::true_type
       {
@@ -64,8 +61,8 @@ namespace ContainerPrinter
       /**
       * @brief Specialization to treat std::tuple<...> as a printable container type.
       */
-      template<typename... DataTypes>
-      struct is_printable_as_container<std::tuple<DataTypes...>> : public std::true_type
+      template<typename... Args>
+      struct is_printable_as_container<std::tuple<Args...>> : public std::true_type
       {
       };
 
@@ -81,8 +78,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character array specialization in order to ensure that we print character arrays
-      * as string and not as delimiter containers.
+      * @brief Narrow character array specialization in order to ensure that we print character
+      * arrays as string and not as delimiter containers.
       */
       template<std::size_t ArraySize>
       struct is_printable_as_container<char[ArraySize]> : public std::false_type
@@ -99,7 +96,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief String specialization in order to ensure that we treat strings as nothing more than strings.
+      * @brief String specialization in order to ensure that we treat strings as nothing more than
+      * strings.
       */
       template<
          typename CharacterType,
@@ -123,364 +121,358 @@ namespace ContainerPrinter
       constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
    }
 
-   /**
-   * @brief Struct to neatly wrap up all the additional characters we'll need in order to
-   * print out the containers.
-   */
-   template<typename CharacterType>
-   struct delimiter_values
+   namespace Decorator
    {
-      using type = CharacterType;
-
-      const type* prefix;
-      const type* separator;
-      const type* suffix;
-   };
-
-   /**
-   * @brief Additional wrapper around the `delimiter_values` struct for added convenience.
-   */
-   template<
-      typename /*ContainerType*/,
-      typename CharacterType
-   >
-   struct delimiters
-   {
-      using type = delimiter_values<CharacterType>;
-
-      static const type values;
-   };
-
-   /**
-   * @brief Default narrow delimiters for any container type that isn't specialized.
-   */
-   template<typename ContainerType>
-   struct delimiters<ContainerType, char>
-   {
-      using type = delimiter_values<char>;
-
-      static constexpr type values = { "[", ", ", "]" };
-   };
-
-   /**
-   * @brief Default wide delimiters for any container type that isn't specialized.
-   */
-   template<typename ContainerType>
-   struct delimiters<ContainerType, wchar_t>
-   {
-      using type = delimiter_values<wchar_t>;
-
-      static constexpr type values = { L"[", L", ", L"]" };
-   };
-
-   /**
-   * @brief Narrow character specialization for std::set<...>.
-   */
-   template<
-      typename DataType,
-      typename ComparatorType,
-      typename AllocatorType
-   >
-   struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
-   {
-      static constexpr delimiter_values<char> values = { "{", ", ", "}" };
-   };
-
-   /**
-   * @brief Wide character specialization for std::set<...>.
-   */
-   template<
-      typename DataType,
-      typename ComparatorType,
-      typename AllocatorType
-   >
-   struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
-   {
-      static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
-   };
-
-   /**
-   * @brief Narrow character specialization for std::multiset<...>.
-   */
-   template<
-      typename DataType,
-      typename ComparatorType,
-      typename AllocatorType
-   >
-   struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
-   {
-      static constexpr delimiter_values<char> values = { "{", ", ", "}" };
-   };
-
-   /**
-   * @brief Wide character specialization for std::multiset<...>.
-   */
-   template<
-      typename DataType,
-      typename ComparatorType,
-      typename AllocatorType
-   >
-   struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
-   {
-      static constexpr delimiter_values<wchar_t> values = { L"{", L", ", L"}" };
-   };
-
-   /**
-   * @brief Narrow character specialization for std::pair<...>.
-   */
-   template<
-      typename FirstType,
-      typename SecondType
-   >
-   struct delimiters<std::pair<FirstType, SecondType>, char>
-   {
-      static constexpr delimiter_values<char> values = { "(", ", ", ")" };
-   };
-
-   /**
-   * @brief Wide character specialization for std::pair<...>.
-   */
-   template<
-      typename FirstType,
-      typename SecondType
-   >
-   struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
-   {
-      static constexpr delimiter_values<wchar_t> values = { L"(", L", ", L")" };
-   };
-
-   /**
-   * @brief Narrow character specialization for std::tuple<...>.
-   */
-   template<typename... DataType>
-   struct delimiters<std::tuple<DataType...>, char>
-   {
-      static constexpr delimiter_values<char> values = { "<", ", ", ">" };
-   };
-
-   /**
-   * @brief Wide character specialization for std::tuple<...>.
-   */
-   template<typename... DataType>
-   struct delimiters<std::tuple<DataType...>, wchar_t>
-   {
-      static constexpr delimiter_values<wchar_t> values = { L"<", L", ", L">" };
-   };
-
-   /**
-   * @brief Recursive tuple helper template to print std::tuple<...> objects.
-   */
-   template<
-      typename TupleType,
-      std::size_t Index
-   >
-   struct tuple_printer
-   {
-      template<
-         typename CharacterType,
-         typename CharacterTraitsType,
-         typename DelimiterValues
-      >
-      inline static void print(
-         std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
-         const TupleType& container,
-         const DelimiterValues& delimiters)
+      /**
+      * @brief Struct to neatly wrap up all the additional characters we'll need in order to
+      * print out the containers.
+      */
+      template<typename CharacterType>
+      struct wrapper
       {
-         tuple_printer<TupleType, Index - 1>::print(stream, container, delimiters);
+         using type = CharacterType;
 
-         stream
-            << delimiters.separator
-            << std::get<Index - 1>(container);
-      }
-   };
-
-   /**
-   * @brief Specialization of tuple helper to handle empty std::tuple<...> objects.
-   */
-   template<typename TupleType>
-   struct tuple_printer<TupleType, 0>
-   {
-      template<
-         typename CharacterType,
-         typename CharacterTraitsType,
-         typename DelimiterValues
-      >
-      inline static void print(
-         std::basic_ostream<CharacterType, CharacterTraitsType>& /*stream*/,
-         const TupleType& /*tuple*/,
-         const DelimiterValues& /*delimiters*/)
-      {
+         const type* prefix;
+         const type* separator;
+         const type* suffix;
       };
-   };
 
-   /**
-   * @brief Specialization of tuple helper for the first index of a std::tuple<...>
-   */
-   template<typename TupleType>
-   struct tuple_printer<TupleType, 1>
-   {
+      /**
+      * @brief Additional wrapper around the `delimiter_values` struct for added convenience.
+      */
       template<
-         typename CharacterType,
-         typename CharacterTraitsType,
-         typename DelimiterValues
+         typename /*ContainerType*/,
+         typename CharacterType
       >
-      inline static void print(
-         std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
-         const TupleType& tuple,
-         const DelimiterValues& /*delimiters*/)
+      struct delimiters
       {
-         stream << std::get<0>(tuple);
-      }
-   };
+         using type = wrapper<CharacterType>;
+
+         static const type values;
+      };
+
+      /**
+      * @brief Default narrow delimiters for any container type that isn't specialized.
+      */
+      template<typename ContainerType>
+      struct delimiters<ContainerType, char>
+      {
+         using type = wrapper<char>;
+
+         static constexpr type values = { "[", ", ", "]" };
+      };
+
+      /**
+      * @brief Default wide delimiters for any container type that isn't specialized.
+      */
+      template<typename ContainerType>
+      struct delimiters<ContainerType, wchar_t>
+      {
+         using type = wrapper<wchar_t>;
+
+         static constexpr type values = { L"[", L", ", L"]" };
+      };
+
+      /**
+      * @brief Narrow character specialization for std::set<...>.
+      */
+      template<
+         typename DataType,
+         typename ComparatorType,
+         typename AllocatorType
+      >
+      struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
+      {
+         static constexpr wrapper<char> values = { "{", ", ", "}" };
+      };
+
+      /**
+      * @brief Wide character specialization for std::set<...>.
+      */
+      template<
+         typename DataType,
+         typename ComparatorType,
+         typename AllocatorType
+      >
+      struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
+      {
+         static constexpr wrapper<wchar_t> values = { L"{", L", ", L"}" };
+      };
+
+      /**
+      * @brief Narrow character specialization for std::multiset<...>.
+      */
+      template<
+         typename DataType,
+         typename ComparatorType,
+         typename AllocatorType
+      >
+      struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
+      {
+         static constexpr wrapper<char> values = { "{", ", ", "}" };
+      };
+
+      /**
+      * @brief Wide character specialization for std::multiset<...>.
+      */
+      template<
+         typename DataType,
+         typename ComparatorType,
+         typename AllocatorType
+      >
+      struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
+      {
+         static constexpr wrapper<wchar_t> values = { L"{", L", ", L"}" };
+      };
+
+      /**
+      * @brief Narrow character specialization for std::pair<...>.
+      */
+      template<
+         typename FirstType,
+         typename SecondType
+      >
+      struct delimiters<std::pair<FirstType, SecondType>, char>
+      {
+         static constexpr wrapper<char> values = { "(", ", ", ")" };
+      };
+
+      /**
+      * @brief Wide character specialization for std::pair<...>.
+      */
+      template<
+         typename FirstType,
+         typename SecondType
+      >
+      struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
+      {
+         static constexpr wrapper<wchar_t> values = { L"(", L", ", L")" };
+      };
+
+      /**
+      * @brief Narrow character specialization for std::tuple<...>.
+      */
+      template<typename... DataType>
+      struct delimiters<std::tuple<DataType...>, char>
+      {
+         static constexpr wrapper<char> values = { "<", ", ", ">" };
+      };
+
+      /**
+      * @brief Wide character specialization for std::tuple<...>.
+      */
+      template<typename... DataType>
+      struct delimiters<std::tuple<DataType...>, wchar_t>
+      {
+         static constexpr wrapper<wchar_t> values = { L"<", L", ", L">" };
+      };
+   }
 
    /**
-   * @brief Specialization for non-zero indices of a std::tuple<...>.
+   * @brief Default container formatter that will be used to print prefix, element, separator, and
+   * suffix strings to an output stream.
    */
    template<
-      typename CharacterType,
-      typename CharacterTraitsType,
-      typename... TupleArgs
+      typename ContainerType,
+      typename StreamType
    >
-   inline static void printing_helper(
-      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
-      const std::tuple<TupleArgs...>& container)
+   struct default_formatter
    {
-      static constexpr auto delimiters =
-         ContainerPrinter::delimiters<
-            std::decay_t<decltype(container)>,
-            CharacterType
-         >::values;
+      static constexpr auto decorators =
+         ContainerPrinter::Decorator::delimiters<ContainerType, StreamType::char_type>::values;
 
-      stream << delimiters.prefix;
-      tuple_printer<decltype(container), sizeof...(TupleArgs)>::print(stream, container, delimiters);
-      stream << delimiters.suffix;
-   }
+      void print_prefix(StreamType& stream) noexcept
+      {
+         stream << decorators.prefix;
+      }
+
+      template<typename ElementType>
+      void print_element(
+         StreamType& stream,
+         const ElementType& element) noexcept
+      {
+         stream << element;
+      }
+
+      void print_delimiter(StreamType& stream) noexcept
+      {
+         stream << decorators.separator;
+      }
+
+      void print_suffix(StreamType& stream) noexcept
+      {
+         stream << decorators.suffix;
+      }
+   };
 
    /**
    * @brief Helper function to determine if a container is empty.
    */
    template<typename ContainerType>
-   inline bool is_empty(const ContainerType& container)
+   inline bool is_empty(const ContainerType& container) noexcept
    {
       return container.empty();
    };
 
    /**
-   * @brief Helper function to be selected for non-empty arrays.
+   * @brief Helper function to test arrays for emptiness.
    */
    template<
       typename ArrayType,
       std::size_t ArraySize
    >
-   constexpr bool is_empty(const ArrayType(&)[ArraySize])
+   constexpr bool is_empty(const ArrayType(&)[ArraySize]) noexcept
    {
-      return false;
+      return !static_cast<bool>(ArraySize);
    }
 
    /**
-   * @brief Helper function to be selected for empty arrays.
+   * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
    */
    template<
-      typename ArrayType,
-      std::size_t /*ArraySize*/
+      typename TupleType,
+      std::size_t Index,
+      std::size_t Last
    >
-   constexpr bool is_empty(const ArrayType(&)[0])
+   struct tuple_handler
    {
-      return true;
-   }
-
-   /**
-   * @brief Printing specialization suitable for most container types.
-   */
-   template<
-      typename ContainerType,
-      typename CharacterTraitsType,
-      typename TraitsType
-   >
-   inline static void printing_helper(
-      std::basic_ostream<CharacterTraitsType, TraitsType>& stream,
-      const ContainerType& container)
-   {
-      static constexpr auto delimiters =
-         ContainerPrinter::delimiters<
-            ContainerType,
-            CharacterTraitsType
-         >::values;
-
-      if (is_empty(container))
+      template<
+         typename StreamType,
+         typename FormatterType
+      >
+      inline static void print(
+         StreamType& stream,
+         const TupleType& container,
+         FormatterType& formatter)
       {
-         stream
-            << delimiters.prefix
-            << delimiters.suffix;
-
-         return;
+         stream << std::get<Index>(container);
+         formatter.print_delimiter(stream);
+         tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
       }
+   };
 
-      auto begin = std::begin(container);
-      stream << delimiters.prefix << *begin;
-      std::advance(begin, 1);
-
-      std::for_each(begin, std::end(container),
-         [&stream] (const auto& value)
+   /**
+   * @brief Specialization of tuple handler to handle empty std::tuple<...> objects.
+   *
+   * @note The use of "-1" as the ending index here is a bit of a hack. Since std::size_t is, by
+   * definition, unsigned, this will evaluate to std::numeric_limits<std::size_t>::max().
+   */
+   template<typename TupleType>
+   struct tuple_handler<TupleType, 0, -1>
+   {
+      template<
+         typename StreamType,
+         typename FormatterType
+      >
+      inline static void print(
+         StreamType& /*stream*/,
+         const TupleType& /*tuple*/,
+         FormatterType& /*formatter*/) noexcept
       {
-         stream << delimiters.separator << value;
-      });
+      };
+   };
 
-      stream << delimiters.suffix;
+   /**
+   * @brief Specialization of tuple handler for handle the last element in the std::tuple<...>
+   * object.
+   */
+   template<
+      typename TupleType,
+      std::size_t Index
+   >
+   struct tuple_handler<TupleType, Index, Index>
+   {
+      template<
+         typename StreamType,
+         typename FormatterType
+      >
+      inline static void print(
+         StreamType& stream,
+         const TupleType& tuple,
+         FormatterType& /*formatter*/) noexcept
+      {
+         stream << std::get<Index>(tuple);
+      }
+   };
+
+   /**
+   * @brief Overload meant to handle std::tuple<...> objects.
+   *
+   * @todo Look into using fold expressions once C++17 arrives.
+   */
+   template<
+      typename StreamType,
+      typename FormatterType,
+      typename... TupleArgs
+   >
+   static void ToStream(
+      StreamType& stream,
+      const std::tuple<TupleArgs...>& container,
+      FormatterType& formatter = { })
+   {
+      using ContainerType = std::decay_t<decltype(container)>;
+
+      formatter.print_prefix(stream);
+      tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
+      formatter.print_suffix(stream);
    }
 
    /**
-   * @brief Printing specialization for std::pair<...>.
+   * @brief Overload meant to handle std::pair<...> objects.
    */
    template<
       typename FirstType,
       typename SecondType,
-      typename CharacterType,
-      typename CharacterTraitsType
+      typename StreamType,
+      typename FormatterType
    >
-   inline static void printing_helper(
-      std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
-      const std::pair<FirstType, SecondType>& container)
+   static void ToStream(
+      StreamType& stream,
+      const std::pair<FirstType, SecondType>& container,
+      FormatterType& formatter = { })
    {
-      static constexpr auto delimiters =
-         ContainerPrinter::delimiters<
-            std::decay_t<decltype(container)>,
-            CharacterType
-         >::values;
-
-      stream
-         << delimiters.prefix
-         << container.first
-         << delimiters.separator
-         << container.second
-         << delimiters.suffix;
+      formatter.print_prefix(stream);
+      formatter.print_element(stream, container.first);
+      formatter.print_delimiter(stream);
+      formatter.print_element(stream, container.second);
+      formatter.print_suffix(stream);
    }
 
    /**
-   * @brief Main class that will print out the container with the help of various templated
-   * helper functions.
+   * @brief Overload meant to handle containers that support the notion of "emptiness".
    */
    template<
       typename ContainerType,
-      typename CharacterType,
-      typename CharacterTraitsType
+      typename StreamType,
+      typename FormatterType
    >
-   class Printer
+   static void ToStream(
+      StreamType& stream,
+      const ContainerType& container,
+      FormatterType& formatter = { })
    {
-   public:
-      Printer(const ContainerType& container)
-         : m_container{ container }
+      formatter.print_prefix(stream);
+
+      if (is_empty(container))
       {
+         formatter.print_suffix(stream);
+         return;
       }
 
-      inline void print_to(std::basic_ostream<CharacterType, CharacterTraitsType>& stream) const
-      {
-         printing_helper(stream, m_container);
-      }
+      auto begin = std::begin(container);
+      formatter.print_element(stream, *begin);
 
-   private:
-      const ContainerType& m_container;
-   };
+      std::advance(begin, 1);
+
+      std::for_each(begin, std::end(container),
+         [&stream, &formatter](const auto& element)
+      {
+         formatter.print_delimiter(stream);
+         formatter.print_element(stream, element);
+      });
+
+      formatter.print_suffix(stream);
+   }
 }
 
 /**
@@ -488,19 +480,15 @@ namespace ContainerPrinter
 */
 template<
    typename ContainerType,
-   typename CharacterType,
-   typename CharacterTraitsType,
+   typename StreamType,
    typename = std::enable_if_t<ContainerPrinter::Traits::is_printable_as_container_v<ContainerType>>
 >
 auto& operator<<(
-   std::basic_ostream<CharacterType, CharacterTraitsType>& stream,
+   StreamType& stream,
    const ContainerType& container)
 {
-   ContainerPrinter::Printer<
-      ContainerType,
-      CharacterType,
-      CharacterTraitsType
-   >{ container }.print_to(stream);
+   using FormatterType = ContainerPrinter::default_formatter<ContainerType, StreamType>;
+   ContainerPrinter::ToStream(stream, container, FormatterType{ });
 
    return stream;
 }
