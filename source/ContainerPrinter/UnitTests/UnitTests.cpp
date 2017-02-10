@@ -447,8 +447,7 @@ TEST_CASE("Printing with Custom Formatters")
    {
       const auto container = std::vector<int>{ 1, 2, 3, 4 };
 
-      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
-      std::wcout << std::flush;
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ }) << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
    }
@@ -457,8 +456,7 @@ TEST_CASE("Printing with Custom Formatters")
    {
       const auto container = std::make_tuple( 1, 2, 3, 4 );
 
-      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
-      std::wcout << std::flush;
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ }) << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
    }
@@ -467,8 +465,7 @@ TEST_CASE("Printing with Custom Formatters")
    {
       const auto container = std::make_pair(1, 2);
 
-      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ });
-      std::wcout << std::flush;
+      ContainerPrinter::ToStream(std::wcout, container, CustomFormatter{ }) << std::flush;
 
       REQUIRE(wideBuffer.str() == std::wstring{ L"$$ 1 | 2 $$" });
    }

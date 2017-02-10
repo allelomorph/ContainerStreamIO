@@ -281,25 +281,25 @@ namespace ContainerPrinter
       static constexpr auto decorators =
          ContainerPrinter::Decorator::delimiters<ContainerType, StreamType::char_type>::values;
 
-      void print_prefix(StreamType& stream) noexcept
+      static void print_prefix(StreamType& stream) noexcept
       {
          stream << decorators.prefix;
       }
 
       template<typename ElementType>
-      void print_element(
+      static void print_element(
          StreamType& stream,
          const ElementType& element) noexcept
       {
          stream << element;
       }
 
-      void print_delimiter(StreamType& stream) noexcept
+      static void print_delimiter(StreamType& stream) noexcept
       {
          stream << decorators.separator;
       }
 
-      void print_suffix(StreamType& stream) noexcept
+      static void print_suffix(StreamType& stream) noexcept
       {
          stream << decorators.suffix;
       }
@@ -405,16 +405,18 @@ namespace ContainerPrinter
       typename FormatterType,
       typename... TupleArgs
    >
-   static void ToStream(
+   static StreamType& ToStream(
       StreamType& stream,
       const std::tuple<TupleArgs...>& container,
-      FormatterType& formatter = { })
+      FormatterType& formatter)
    {
       using ContainerType = std::decay_t<decltype(container)>;
 
       formatter.print_prefix(stream);
       tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
       formatter.print_suffix(stream);
+
+      return stream;
    }
 
    /**
@@ -426,16 +428,18 @@ namespace ContainerPrinter
       typename StreamType,
       typename FormatterType
    >
-   static void ToStream(
+   static StreamType& ToStream(
       StreamType& stream,
       const std::pair<FirstType, SecondType>& container,
-      FormatterType& formatter = { })
+      FormatterType& formatter)
    {
       formatter.print_prefix(stream);
       formatter.print_element(stream, container.first);
       formatter.print_delimiter(stream);
       formatter.print_element(stream, container.second);
       formatter.print_suffix(stream);
+
+      return stream;
    }
 
    /**
@@ -446,17 +450,18 @@ namespace ContainerPrinter
       typename StreamType,
       typename FormatterType
    >
-   static void ToStream(
+   static StreamType& ToStream(
       StreamType& stream,
       const ContainerType& container,
-      FormatterType& formatter = { })
+      FormatterType& formatter)
    {
       formatter.print_prefix(stream);
 
       if (is_empty(container))
       {
          formatter.print_suffix(stream);
-         return;
+
+         return stream;
       }
 
       auto begin = std::begin(container);
@@ -472,6 +477,8 @@ namespace ContainerPrinter
       });
 
       formatter.print_suffix(stream);
+
+      return stream;
    }
 }
 
