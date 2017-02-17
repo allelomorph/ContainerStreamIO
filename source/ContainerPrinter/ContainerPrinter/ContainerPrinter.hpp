@@ -41,7 +41,8 @@ namespace ContainerPrinter
          void_t<
             decltype(std::declval<Type&>().begin()),
             decltype(std::declval<Type&>().end()),
-            decltype(std::declval<Type&>().empty())
+            decltype(std::declval<Type&>().empty()),
+            decltype(std::declval<Type&>()::iterator)
          >
       > : public std::true_type
       {
@@ -78,8 +79,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character array specialization in order to ensure that we print character
-      * arrays as string and not as delimiter containers.
+      * @brief Narrow character array specialization meant to ensure that we print character arrays
+      * as strings and not as delimiter containers of individual characters.
       */
       template<std::size_t ArraySize>
       struct is_printable_as_container<char[ArraySize]> : public std::false_type
@@ -87,8 +88,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Wide character array specialization in order to ensure that we print character arrays
-      * as string and not as delimiter containers.
+      * @brief Wide character array specialization meant to ensure that we print character arrays
+      * as strings and not as delimiter containers of individual characters.
       */
       template<std::size_t ArraySize>
       struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
@@ -96,7 +97,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief String specialization in order to ensure that we treat strings as nothing more than
+      * @brief String specialization meant to ensure that we treat strings as nothing more than
       * strings.
       */
       template<
@@ -138,7 +139,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Additional wrapper around the `delimiter_values` struct for added convenience.
+      * @brief Base definition for the delimiters. This probably won't ever get invoked.
       */
       template<
          typename /*ContainerType*/,
@@ -152,7 +153,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Default narrow delimiters for any container type that isn't specialized.
+      * @brief Default narrow character specialization for any container type that isn't even
+      * more specialized.
       */
       template<typename ContainerType>
       struct delimiters<ContainerType, char>
@@ -163,7 +165,8 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Default wide delimiters for any container type that isn't specialized.
+      * @brief Default wide character specialization for any container type that isn't even
+      * more specialized.
       */
       template<typename ContainerType>
       struct delimiters<ContainerType, wchar_t>
@@ -174,7 +177,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character specialization for std::set<...>.
+      * @brief Narrow character specialization for std::set<...> instances.
       */
       template<
          typename DataType,
@@ -187,7 +190,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Wide character specialization for std::set<...>.
+      * @brief Wide character specialization for std::set<...> instances.
       */
       template<
          typename DataType,
@@ -200,7 +203,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character specialization for std::multiset<...>.
+      * @brief Narrow character specialization for std::multiset<...> instances.
       */
       template<
          typename DataType,
@@ -213,7 +216,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Wide character specialization for std::multiset<...>.
+      * @brief Wide character specialization for std::multiset<...> instances.
       */
       template<
          typename DataType,
@@ -226,7 +229,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character specialization for std::pair<...>.
+      * @brief Narrow character specialization for std::pair<...> instances.
       */
       template<
          typename FirstType,
@@ -238,7 +241,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Wide character specialization for std::pair<...>.
+      * @brief Wide character specialization for std::pair<...> instances.
       */
       template<
          typename FirstType,
@@ -250,7 +253,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Narrow character specialization for std::tuple<...>.
+      * @brief Narrow character specialization for std::tuple<...> instances.
       */
       template<typename... DataType>
       struct delimiters<std::tuple<DataType...>, char>
@@ -259,7 +262,7 @@ namespace ContainerPrinter
       };
 
       /**
-      * @brief Wide character specialization for std::tuple<...>.
+      * @brief Wide character specialization for std::tuple<...> instances.
       */
       template<typename... DataType>
       struct delimiters<std::tuple<DataType...>, wchar_t>
@@ -352,7 +355,7 @@ namespace ContainerPrinter
    };
 
    /**
-   * @brief Specialization of tuple handler to handle empty std::tuple<...> objects.
+   * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
    *
    * @note The use of "-1" as the ending index here is a bit of a hack. Since std::size_t is, by
    * definition, unsigned, this will evaluate to std::numeric_limits<std::size_t>::max().
@@ -373,7 +376,7 @@ namespace ContainerPrinter
    };
 
    /**
-   * @brief Specialization of tuple handler for handle the last element in the std::tuple<...>
+   * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
    * object.
    */
    template<
@@ -396,7 +399,7 @@ namespace ContainerPrinter
    };
 
    /**
-   * @brief Overload meant to handle std::tuple<...> objects.
+   * @brief Overload to deal with std::tuple<...> objects.
    *
    * @todo Look into using fold expressions once C++17 arrives.
    */
@@ -420,7 +423,7 @@ namespace ContainerPrinter
    }
 
    /**
-   * @brief Overload meant to handle std::pair<...> objects.
+   * @brief Overload to handle std::pair<...> objects.
    */
    template<
       typename FirstType,
@@ -443,7 +446,8 @@ namespace ContainerPrinter
    }
 
    /**
-   * @brief Overload meant to handle containers that support the notion of "emptiness".
+   * @brief Overload to handle containers that support the notion of "emptiness,"
+   * and forward-iterability.
    */
    template<
       typename ContainerType,
