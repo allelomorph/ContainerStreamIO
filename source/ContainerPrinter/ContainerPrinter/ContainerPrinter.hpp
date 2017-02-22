@@ -39,10 +39,10 @@ namespace ContainerPrinter
       struct is_printable_as_container<
          Type,
          void_t<
+            typename Type::iterator,
             decltype(std::declval<Type&>().begin()),
             decltype(std::declval<Type&>().end()),
-            decltype(std::declval<Type&>().empty()),
-            decltype(std::declval<Type&>()::iterator)
+            decltype(std::declval<Type&>().empty())
          >
       > : public std::true_type
       {
