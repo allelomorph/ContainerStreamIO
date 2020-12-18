@@ -282,7 +282,7 @@ namespace ContainerPrinter
    struct default_formatter
    {
       static constexpr auto decorators =
-         ContainerPrinter::Decorator::delimiters<ContainerType, StreamType::char_type>::values;
+         ContainerPrinter::Decorator::delimiters<ContainerType, typename StreamType::char_type>::values;
 
       static void print_prefix(StreamType& stream) noexcept
       {
@@ -346,7 +346,7 @@ namespace ContainerPrinter
       inline static void print(
          StreamType& stream,
          const TupleType& container,
-         FormatterType& formatter)
+         const FormatterType& formatter)
       {
          stream << std::get<Index>(container);
          formatter.print_delimiter(stream);
@@ -356,12 +356,9 @@ namespace ContainerPrinter
 
    /**
    * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
-   *
-   * @note The use of "-1" as the ending index here is a bit of a hack. Since std::size_t is, by
-   * definition, unsigned, this will evaluate to std::numeric_limits<std::size_t>::max().
    */
    template<typename TupleType>
-   struct tuple_handler<TupleType, 0, -1>
+   struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
    {
       template<
          typename StreamType,
@@ -370,7 +367,7 @@ namespace ContainerPrinter
       inline static void print(
          StreamType& /*stream*/,
          const TupleType& /*tuple*/,
-         FormatterType& /*formatter*/) noexcept
+         const FormatterType& /*formatter*/) noexcept
       {
       };
    };
@@ -392,7 +389,7 @@ namespace ContainerPrinter
       inline static void print(
          StreamType& stream,
          const TupleType& tuple,
-         FormatterType& /*formatter*/) noexcept
+         const FormatterType& /*formatter*/) noexcept
       {
          stream << std::get<Index>(tuple);
       }
@@ -411,7 +408,7 @@ namespace ContainerPrinter
    static StreamType& ToStream(
       StreamType& stream,
       const std::tuple<TupleArgs...>& container,
-      FormatterType& formatter)
+      const FormatterType& formatter)
    {
       using ContainerType = std::decay_t<decltype(container)>;
 
@@ -434,7 +431,7 @@ namespace ContainerPrinter
    static StreamType& ToStream(
       StreamType& stream,
       const std::pair<FirstType, SecondType>& container,
-      FormatterType& formatter)
+      const FormatterType& formatter)
    {
       formatter.print_prefix(stream);
       formatter.print_element(stream, container.first);
@@ -457,7 +454,7 @@ namespace ContainerPrinter
    static StreamType& ToStream(
       StreamType& stream,
       const ContainerType& container,
-      FormatterType& formatter)
+      const FormatterType& formatter)
    {
       formatter.print_prefix(stream);
 

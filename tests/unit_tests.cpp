@@ -1,11 +1,7 @@
-#pragma once
-
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-#include "Catch.hpp"
+#include <catch2/catch.hpp>
 
-#include "ScopeExit.hpp"
-
-#include "../ContainerPrinter/ContainerPrinter.hpp"
+#include "container_printer.h"
 
 #include <algorithm>
 #include <list>
@@ -16,6 +12,36 @@
 
 namespace
 {
+    /**
+     * @brief An RAII wrapper that will execute an action when the wrapper falls out of scope, or is
+     * otherwise destroyed.
+     */
+    template <typename LambdaType> class ScopeExit
+    {
+    public:
+        ScopeExit(LambdaType&& lambda) noexcept : m_lambda{ std::move(lambda) }
+        {
+            static_assert(
+                std::is_nothrow_invocable<LambdaType>::value,
+                "Since the callable type is invoked from the destructor, exceptions are not allowed.");
+        }
+
+        ~ScopeExit() noexcept
+        {
+            m_lambda();
+        }
+
+        ScopeExit(const ScopeExit&) = delete;
+        ScopeExit& operator=(const ScopeExit&) = delete;
+
+        ScopeExit(ScopeExit&&) = default;
+        ScopeExit& operator=(ScopeExit&&) = default;
+
+    private:
+        LambdaType m_lambda;
+    };
+
+
    template<typename Type>
    class VectorWrapper : public std::vector<Type> 
    {
@@ -27,7 +53,7 @@ namespace
    struct CustomFormatter
    {
       template<typename StreamType>
-      void print_prefix(StreamType& stream) noexcept
+      void print_prefix(StreamType& stream) const noexcept
       {
          stream << L"$$ ";
       }
@@ -38,19 +64,19 @@ namespace
       >
       void print_element(
          StreamType& stream,
-         const ElementType& element) noexcept
+         const ElementType& element) const noexcept
       {
          stream << element;
       }
 
       template<typename StreamType>
-      void print_delimiter(StreamType& stream) noexcept
+      void print_delimiter(StreamType& stream) const noexcept
       {
          stream << L" | ";
       }
 
       template<typename StreamType>
-      void print_suffix(StreamType& stream) noexcept
+      void print_suffix(StreamType& stream) const noexcept
       {
          stream << L" $$";
       }
@@ -107,65 +133,65 @@ TEST_CASE("Delimiter Validation")
    SECTION("Verify narrow character delimiters for a non-specialized container type.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<char[], char>::values;
-      REQUIRE(delimiters.prefix == "[");
-      REQUIRE(delimiters.separator == ", ");
-      REQUIRE(delimiters.suffix == "]");
+      REQUIRE(delimiters.prefix == std::string_view{ "[" });
+      REQUIRE(delimiters.separator == std::string_view{ ", " });
+      REQUIRE(delimiters.suffix == std::string_view{ "]" });
    }
 
    SECTION("Verify wide character delimiters for a non-specialized container type.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<wchar_t[], wchar_t>::values;
-      REQUIRE(delimiters.prefix == L"[");
-      REQUIRE(delimiters.separator == L", ");
-      REQUIRE(delimiters.suffix == L"]");
+      REQUIRE(delimiters.prefix == std::wstring_view{ L"[" });
+      REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+      REQUIRE(delimiters.suffix == std::wstring_view{ L"]" });
    }
 
    SECTION("Verify narrow character delimiters for a std::set<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::set<int>, char>::values;
-      REQUIRE(delimiters.prefix == "{");
-      REQUIRE(delimiters.separator == ", ");
-      REQUIRE(delimiters.suffix == "}");
+      REQUIRE(delimiters.prefix == std::string_view{ "{" });
+      REQUIRE(delimiters.separator == std::string_view{ ", " });
+      REQUIRE(delimiters.suffix == std::string_view{ "}" });
    }
 
    SECTION("Verify wide character delimiters for a std::set<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::set<int>, wchar_t>::values;
-      REQUIRE(delimiters.prefix == L"{");
-      REQUIRE(delimiters.separator == L", ");
-      REQUIRE(delimiters.suffix == L"}");
+      REQUIRE(delimiters.prefix == std::wstring_view{ L"{" });
+      REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+      REQUIRE(delimiters.suffix == std::wstring_view{ L"}" });
    }
 
    SECTION("Verify narrow character delimiters for a std::pair<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::pair<int, int>, char>::values;
-      REQUIRE(delimiters.prefix == "(");
-      REQUIRE(delimiters.separator == ", ");
-      REQUIRE(delimiters.suffix == ")");
+      REQUIRE(delimiters.prefix == std::string_view{ "(" });
+      REQUIRE(delimiters.separator == std::string_view{ ", " });
+      REQUIRE(delimiters.suffix == std::string_view{ ")" });
    }
 
    SECTION("Verify wide character delimiters for a std::pair<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::pair<int, int>, wchar_t>::values;
-      REQUIRE(delimiters.prefix == L"(");
-      REQUIRE(delimiters.separator == L", ");
-      REQUIRE(delimiters.suffix == L")");
+      REQUIRE(delimiters.prefix == std::wstring_view{ L"(" });
+      REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+      REQUIRE(delimiters.suffix == std::wstring_view{ L")" });
    }
 
    SECTION("Verify narrow character delimiters for a std::tuple<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::tuple<int, int>, char>::values;
-      REQUIRE(delimiters.prefix == "<");
-      REQUIRE(delimiters.separator == ", ");
-      REQUIRE(delimiters.suffix == ">");
+      REQUIRE(delimiters.prefix == std::string_view{ "<" });
+      REQUIRE(delimiters.separator == std::string_view{ ", " });
+      REQUIRE(delimiters.suffix == std::string_view{ ">" });
    }
 
    SECTION("Verify wide character delimiters for a std::tuple<...>.")
    {
       constexpr auto delimiters = ContainerPrinter::Decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
-      REQUIRE(delimiters.prefix == L"<");
-      REQUIRE(delimiters.separator == L", ");
-      REQUIRE(delimiters.suffix == L">");
+      REQUIRE(delimiters.prefix == std::wstring_view{ L"<" });
+      REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+      REQUIRE(delimiters.suffix == std::wstring_view{ L">" });
    }
 }
 
@@ -173,13 +199,11 @@ TEST_CASE("Printing of Raw Arrays")
 {
    std::stringstream narrowBuffer;
    auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+   const ScopeExit resetNarrow = [&]() noexcept { std::cout.rdbuf(oldNarrowBuffer); };
 
    std::wstringstream wideBuffer;
    auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+   const ScopeExit resetWide = [&]() noexcept { std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a narrow character array.")
    {
@@ -218,13 +242,11 @@ TEST_CASE("Printing of Standard Library Containers")
 {
    std::stringstream narrowBuffer;
    auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+   const ScopeExit resetNarrow = [&]() noexcept { std::cout.rdbuf(oldNarrowBuffer); };
 
    std::wstringstream wideBuffer;
    auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+   const ScopeExit resetWide = [&]() noexcept { std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a std::pair<...> to a narrow stream.")
    {
@@ -350,14 +372,12 @@ TEST_CASE("Printing of Standard Library Containers")
 TEST_CASE("Printing of Nested Containers")
 {
    std::stringstream narrowBuffer;
-   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+   auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+   const ScopeExit resetNarrow = [&]() noexcept { std::cout.rdbuf(oldNarrowBuffer); };
 
    std::wstringstream wideBuffer;
-   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+   auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+   const ScopeExit resetWide = [&]() noexcept { std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a populated std::unordered_map<...> to a narrow stream.")
    {
@@ -434,14 +454,12 @@ TEST_CASE("Printing of Nested Containers")
 TEST_CASE("Printing with Custom Formatters")
 {
    std::stringstream narrowBuffer;
-   std::streambuf* oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::cout.rdbuf(oldNarrowBuffer); };
+   auto* const oldNarrowBuffer = std::cout.rdbuf(narrowBuffer.rdbuf());
+   const ScopeExit resetNarrow = [&]() noexcept { std::cout.rdbuf(oldNarrowBuffer); };
 
    std::wstringstream wideBuffer;
-   std::wstreambuf* oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
-
-   ON_SCOPE_EXIT{ std::wcout.rdbuf(oldWideBuffer); };
+   auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
+   const ScopeExit resetWide = [&]() noexcept { std::wcout.rdbuf(oldWideBuffer); };
 
    SECTION("Printing a populated std::vector<...> to a wide stream.")
    {
