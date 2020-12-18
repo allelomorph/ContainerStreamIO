@@ -8,9 +8,9 @@
 #include <tuple>
 #include <utility>
 
-namespace ContainerPrinter
+namespace container_printer
 {
-namespace Traits
+namespace traits
 {
 /**
  * @brief A neat SFINAE trick.
@@ -22,7 +22,7 @@ template <class...> using void_t = void;
 /**
  * @brief Base case for the testing of STD compatible container types.
  */
-template <typename /*Type*/, typename = void>
+template <typename Type, typename = void>
 struct is_printable_as_container : public std::false_type
 {
 };
@@ -223,7 +223,7 @@ template <typename... DataType> struct delimiters<std::tuple<DataType...>, wchar
  */
 template <typename ContainerType, typename StreamType> struct default_formatter
 {
-    static constexpr auto decorators = ContainerPrinter::Decorator::delimiters<
+    static constexpr auto decorators = container_printer::Decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
 
     static void print_prefix(StreamType& stream) noexcept
@@ -314,7 +314,7 @@ template <typename TupleType, std::size_t Index> struct tuple_handler<TupleType,
  * @todo Look into using fold expressions once C++17 arrives.
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
-static StreamType& ToStream(
+static StreamType& to_stream(
     StreamType& stream, const std::tuple<TupleArgs...>& container, const FormatterType& formatter)
 {
     using ContainerType = std::decay_t<decltype(container)>;
@@ -330,7 +330,7 @@ static StreamType& ToStream(
  * @brief Overload to handle std::pair<...> objects.
  */
 template <typename FirstType, typename SecondType, typename StreamType, typename FormatterType>
-static StreamType& ToStream(
+static StreamType& to_stream(
     StreamType& stream, const std::pair<FirstType, SecondType>& container,
     const FormatterType& formatter)
 {
@@ -349,7 +349,7 @@ static StreamType& ToStream(
  */
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType&
-ToStream(StreamType& stream, const ContainerType& container, const FormatterType& formatter)
+to_stream(StreamType& stream, const ContainerType& container, const FormatterType& formatter)
 {
     formatter.print_prefix(stream);
 
@@ -381,11 +381,11 @@ ToStream(StreamType& stream, const ContainerType& container, const FormatterType
 template <
     typename ContainerType, typename StreamType,
     typename =
-        std::enable_if_t<ContainerPrinter::Traits::is_printable_as_container_v<ContainerType>>>
+        std::enable_if_t<container_printer::traits::is_printable_as_container_v<ContainerType>>>
 auto& operator<<(StreamType& stream, const ContainerType& container)
 {
-    using FormatterType = ContainerPrinter::default_formatter<ContainerType, StreamType>;
-    ContainerPrinter::ToStream(stream, container, FormatterType{});
+    using formatter_type = container_printer::default_formatter<ContainerType, StreamType>;
+    container_printer::to_stream(stream, container, formatter_type{});
 
     return stream;
 }
