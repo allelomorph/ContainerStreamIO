@@ -315,7 +315,7 @@ namespace ContainerPrinter
    inline bool is_empty(const ContainerType& container) noexcept
    {
       return container.empty();
-   };
+   }
 
    /**
    * @brief Helper function to test arrays for emptiness.
@@ -369,7 +369,7 @@ namespace ContainerPrinter
          const TupleType& /*tuple*/,
          const FormatterType& /*formatter*/) noexcept
       {
-      };
+      }
    };
 
    /**
