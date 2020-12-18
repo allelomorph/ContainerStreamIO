@@ -13,17 +13,9 @@ namespace container_printer
 namespace traits
 {
 /**
- * @brief A neat SFINAE trick.
- *
- * @see N3911
- */
-template <class...> using void_t = void;
-
-/**
  * @brief Base case for the testing of STD compatible container types.
  */
-template <typename Type, typename = void>
-struct is_printable_as_container : public std::false_type
+template <typename Type, typename = void> struct is_printable_as_container : public std::false_type
 {
 };
 
@@ -33,7 +25,7 @@ struct is_printable_as_container : public std::false_type
  */
 template <typename Type>
 struct is_printable_as_container<
-    Type, void_t<
+    Type, std::void_t<
               typename Type::iterator, decltype(std::declval<Type&>().begin()),
               decltype(std::declval<Type&>().end()), decltype(std::declval<Type&>().empty())>>
     : public std::true_type
@@ -97,7 +89,7 @@ struct is_printable_as_container<
  */
 template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
-} // namespace Traits
+} // namespace traits
 
 namespace Decorator
 {
@@ -251,7 +243,7 @@ template <typename ContainerType, typename StreamType> struct default_formatter
 /**
  * @brief Helper function to determine if a container is empty.
  */
-template <typename ContainerType> inline bool is_empty(const ContainerType& container) noexcept
+template <typename ContainerType> bool is_empty(const ContainerType& container) noexcept
 {
     return container.empty();
 }
@@ -271,7 +263,7 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 template <typename TupleType, std::size_t Index, std::size_t Last> struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
-    inline static void
+    static void
     print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
     {
         stream << std::get<Index>(container);
@@ -287,7 +279,7 @@ template <typename TupleType>
 struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
 {
     template <typename StreamType, typename FormatterType>
-    inline static void print(
+    static void print(
         StreamType& /*stream*/, const TupleType& /*tuple*/,
         const FormatterType& /*formatter*/) noexcept
     {
@@ -301,7 +293,7 @@ struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
 template <typename TupleType, std::size_t Index> struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
-    inline static void
+    static void
     print(StreamType& stream, const TupleType& tuple, const FormatterType& /*formatter*/) noexcept
     {
         stream << std::get<Index>(tuple);
@@ -310,8 +302,6 @@ template <typename TupleType, std::size_t Index> struct tuple_handler<TupleType,
 
 /**
  * @brief Overload to deal with std::tuple<...> objects.
- *
- * @todo Look into using fold expressions once C++17 arrives.
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& to_stream(
@@ -373,7 +363,7 @@ to_stream(StreamType& stream, const ContainerType& container, const FormatterTyp
 
     return stream;
 }
-} // namespace ContainerPrinter
+} // namespace container_printer
 
 /**
  * @brief Overload of the stream output operator for compatible containers.
