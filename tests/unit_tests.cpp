@@ -7,7 +7,7 @@
 #include <list>
 #include <functional>
 #include <set>
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 namespace
@@ -379,9 +379,9 @@ TEST_CASE("Printing of Nested Containers")
    auto* const oldWideBuffer = std::wcout.rdbuf(wideBuffer.rdbuf());
    const ScopeExit resetWide = [&]() noexcept { std::wcout.rdbuf(oldWideBuffer); };
 
-   SECTION("Printing a populated std::unordered_map<...> to a narrow stream.")
+   SECTION("Printing a populated std::map<...> to a narrow stream.")
    {
-      const auto map = std::unordered_map<int, std::string>
+      const auto map = std::map<int, std::string>
       {
          { 1, "Template" },
          { 2, "Meta" },
@@ -393,9 +393,9 @@ TEST_CASE("Printing of Nested Containers")
       REQUIRE(narrowBuffer.str() == std::string{ "[(1, Template), (2, Meta), (3, Programming)]" });
    }
 
-   SECTION("Printing a populated std::unordered_map<...> to a wide stream.")
+   SECTION("Printing a populated std::map<...> to a wide stream.")
    {
-      const auto map = std::unordered_map<int, std::wstring>
+      const auto map = std::map<int, std::wstring>
       {
          { 1, L"Template" },
          { 2, L"Meta" },
