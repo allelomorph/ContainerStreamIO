@@ -39,3 +39,6 @@
 # Release and Debug Folders
 **/Release/*
 **/Debug/*
+build/*
+.vscode/*
+.vs/*
