@@ -116,7 +116,7 @@ TEST_CASE("Delimiter Validation")
 {
     SECTION("Verify narrow character delimiters for a non-specialized container type.")
     {
-        constexpr auto delimiters = container_printer::Decorator::delimiters<char[], char>::values;
+        constexpr auto delimiters = container_printer::decorator::delimiters<char[], char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "[" });
         REQUIRE(delimiters.separator == std::string_view{ ", " });
@@ -126,7 +126,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify wide character delimiters for a non-specialized container type.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<wchar_t[], wchar_t>::values;
+            container_printer::decorator::delimiters<wchar_t[], wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"[" });
         REQUIRE(delimiters.separator == std::wstring_view{ L", " });
@@ -136,7 +136,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify narrow character delimiters for a std::set<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::set<int>, char>::values;
+            container_printer::decorator::delimiters<std::set<int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "{" });
         REQUIRE(delimiters.separator == std::string_view{ ", " });
@@ -146,7 +146,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify wide character delimiters for a std::set<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::set<int>, wchar_t>::values;
+            container_printer::decorator::delimiters<std::set<int>, wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"{" });
         REQUIRE(delimiters.separator == std::wstring_view{ L", " });
@@ -156,7 +156,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify narrow character delimiters for a std::pair<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::pair<int, int>, char>::values;
+            container_printer::decorator::delimiters<std::pair<int, int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "(" });
         REQUIRE(delimiters.separator == std::string_view{ ", " });
@@ -166,7 +166,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify wide character delimiters for a std::pair<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::pair<int, int>, wchar_t>::values;
+            container_printer::decorator::delimiters<std::pair<int, int>, wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"(" });
         REQUIRE(delimiters.separator == std::wstring_view{ L", " });
@@ -176,7 +176,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify narrow character delimiters for a std::tuple<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::tuple<int, int>, char>::values;
+            container_printer::decorator::delimiters<std::tuple<int, int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "<" });
         REQUIRE(delimiters.separator == std::string_view{ ", " });
@@ -186,7 +186,7 @@ TEST_CASE("Delimiter Validation")
     SECTION("Verify wide character delimiters for a std::tuple<...>.")
     {
         constexpr auto delimiters =
-            container_printer::Decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
+            container_printer::decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
             
         REQUIRE(delimiters.prefix == std::wstring_view{ L"<" });
         REQUIRE(delimiters.separator == std::wstring_view{ L", " });
