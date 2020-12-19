@@ -13,7 +13,7 @@ namespace container_printer
 namespace traits
 {
 /**
- * @brief Base case for the testing of STD compatible container types.
+ * @brief Base case for the testing of STL compatible container types.
  */
 template <typename Type, typename = void> struct is_printable_as_container : public std::false_type
 {
