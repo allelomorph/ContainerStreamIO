@@ -91,7 +91,7 @@ template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
 } // namespace traits
 
-namespace Decorator
+namespace decorator
 {
 /**
  * @brief Struct to neatly wrap up all the additional characters we'll need in order to
@@ -207,7 +207,7 @@ template <typename... DataType> struct delimiters<std::tuple<DataType...>, wchar
 {
     static constexpr wrapper<wchar_t> values = { L"<", L", ", L">" };
 };
-} // namespace Decorator
+} // namespace decorator
 
 /**
  * @brief Default container formatter that will be used to print prefix, element, separator, and
@@ -215,7 +215,7 @@ template <typename... DataType> struct delimiters<std::tuple<DataType...>, wchar
  */
 template <typename ContainerType, typename StreamType> struct default_formatter
 {
-    static constexpr auto decorators = container_printer::Decorator::delimiters<
+    static constexpr auto decorators = container_printer::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
 
     static void print_prefix(StreamType& stream) noexcept
