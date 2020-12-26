@@ -1,5 +1,7 @@
 # Container Printer
 
+[![codecov](https://codecov.io/gh/TimSevereijns/ContainerPrinter/branch/master/graph/badge.svg?token=zGutJl938m)](https://codecov.io/gh/TimSevereijns/ContainerPrinter)
+
 A simple header-only solution to enable easier `std::ostream` printing of various Standard Library data structures. Using this library, a `std::vector<int>`, for instance, might be printed as follows:
 
 ```C++

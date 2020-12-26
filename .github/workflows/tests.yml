@@ -25,6 +25,13 @@ jobs:
           sudo update-alternatives --config gcc
           sudo update-alternatives --config g++
           sudo update-alternatives --config gcov
+          
+      - name: Install LCov
+        run: |
+          wget https://github.com/linux-test-project/lcov/releases/download/v1.15/lcov-1.15.tar.gz
+          tar -xvf lcov-1.15.tar.gz
+          cd lcov-1.15 && sudo make install
+          cd ..   
 
       - name: Build Project
         run: |
@@ -37,3 +44,17 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/build
           ./tests
+
+      - name: Collect Coverage
+        run: |
+          lcov --capture --directory . --output-file coverage.info
+          lcov \
+            --remove coverage.info '/usr/*' '*/third-party/*' '*/tests/*' \
+            --output-file coverage.info
+          lcov --list coverage.info
+          
+      - name: Upload Coverage Report
+        run: |
+          export CODECOV_TOKEN=${{ secrets.CodeCov }}
+          bash <(curl -s https://codecov.io/bash) -f coverage.info || \
+          echo "Codecov did not collect coverage reports"
