@@ -254,7 +254,7 @@ template <typename ContainerType> bool is_empty(const ContainerType& container) 
 template <typename ArrayType, std::size_t ArraySize>
 constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 {
-    return !static_cast<bool>(ArraySize);
+    return ArraySize == 0;
 }
 
 /**
@@ -368,11 +368,9 @@ to_stream(StreamType& stream, const ContainerType& container, const FormatterTyp
 /**
  * @brief Overload of the stream output operator for compatible containers.
  */
-template <
-    typename ContainerType, typename StreamType,
-    typename =
-        std::enable_if_t<container_printer::traits::is_printable_as_container_v<ContainerType>>>
-auto& operator<<(StreamType& stream, const ContainerType& container)
+template <typename ContainerType, typename StreamType>
+auto operator<<(StreamType& stream, const ContainerType& container) -> std::enable_if_t<
+    container_printer::traits::is_printable_as_container_v<ContainerType>, StreamType&>
 {
     using formatter_type = container_printer::default_formatter<ContainerType, StreamType>;
     container_printer::to_stream(stream, container, formatter_type{});

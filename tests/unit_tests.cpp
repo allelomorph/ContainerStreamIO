@@ -187,7 +187,7 @@ TEST_CASE("Delimiter Validation")
     {
         constexpr auto delimiters =
             container_printer::decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
-            
+
         REQUIRE(delimiters.prefix == std::wstring_view{ L"<" });
         REQUIRE(delimiters.separator == std::wstring_view{ L", " });
         REQUIRE(delimiters.suffix == std::wstring_view{ L">" });
@@ -209,7 +209,7 @@ TEST_CASE("Printing of Raw Arrays")
         const auto& array = "Hello";
         std::cout << array << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "Hello" });
+        REQUIRE(narrow_buffer.str() == "Hello");
     }
 
     SECTION("Printing a wide character array.")
@@ -217,7 +217,7 @@ TEST_CASE("Printing of Raw Arrays")
         const auto& array = L"Hello";
         std::wcout << array << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"Hello" });
+        REQUIRE(wide_buffer.str() == L"Hello");
     }
 
     SECTION("Printing an array of ints to a narrow stream.")
@@ -225,7 +225,7 @@ TEST_CASE("Printing of Raw Arrays")
         const int array[5] = { 1, 2, 3, 4, 5 };
         std::cout << array << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "[1, 2, 3, 4, 5]" });
+        REQUIRE(narrow_buffer.str() == "[1, 2, 3, 4, 5]");
     }
 
     SECTION("Printing an array of ints to a wide stream.")
@@ -233,7 +233,7 @@ TEST_CASE("Printing of Raw Arrays")
         const int array[5] = { 1, 2, 3, 4, 5 };
         std::wcout << array << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"[1, 2, 3, 4, 5]" });
+        REQUIRE(wide_buffer.str() == L"[1, 2, 3, 4, 5]");
     }
 }
 
@@ -252,7 +252,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto pair = std::make_pair(10, 100);
         std::cout << pair << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "(10, 100)" });
+        REQUIRE(narrow_buffer.str() == "(10, 100)");
     }
 
     SECTION("Printing a std::pair<...> to a wide stream.")
@@ -260,7 +260,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto pair = std::make_pair(10, 100);
         std::wcout << pair << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"(10, 100)" });
+        REQUIRE(wide_buffer.str() == L"(10, 100)");
     }
 
     SECTION("Printing an empty std::vector<...> to a wide stream.")
@@ -268,7 +268,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::vector<int> vector{};
         std::wcout << vector << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"[]" });
+        REQUIRE(wide_buffer.str() == L"[]");
     }
 
     SECTION("Printing a populated std::vector<...> to a narrow stream.")
@@ -276,7 +276,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::vector<int> vector{ 1, 2, 3, 4 };
         std::cout << vector << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "[1, 2, 3, 4]" });
+        REQUIRE(narrow_buffer.str() == "[1, 2, 3, 4]");
     }
 
     SECTION("Printing a populated std::vector<...> to a wide stream.")
@@ -284,7 +284,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::vector<int> vector{ 1, 2, 3, 4 };
         std::wcout << vector << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"[1, 2, 3, 4]" });
+        REQUIRE(wide_buffer.str() == L"[1, 2, 3, 4]");
     }
 
     SECTION("Printing an empty std::set<...> to a narrow stream.")
@@ -292,7 +292,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::set<int> set{};
         std::cout << set << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "{}" });
+        REQUIRE(narrow_buffer.str() == "{}");
     }
 
     SECTION("Printing an empty std::set<...> to a wide stream.")
@@ -300,7 +300,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::set<int> set{};
         std::wcout << set << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"{}" });
+        REQUIRE(wide_buffer.str() == L"{}");
     }
 
     SECTION("Printing a populated std::set<...> to a narrow stream.")
@@ -308,7 +308,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::set<int> set{ 1, 2, 3, 4 };
         std::cout << set << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "{1, 2, 3, 4}" });
+        REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
     }
 
     SECTION("Printing a populated std::set<...> to a wide stream.")
@@ -316,7 +316,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::set<int> set{ 1, 2, 3, 4 };
         std::wcout << set << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
+        REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
     }
 
     SECTION("Printing a populated std::multiset<...> to a narrow stream.")
@@ -324,7 +324,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::multiset<int> multiset{ 1, 2, 3, 4 };
         std::cout << multiset << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "{1, 2, 3, 4}" });
+        REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
     }
 
     SECTION("Printing a populated std::multiset<...> to a wide stream.")
@@ -332,7 +332,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const std::multiset<int> multiset{ 1, 2, 3, 4 };
         std::wcout << multiset << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"{1, 2, 3, 4}" });
+        REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
     }
 
     SECTION("Printing an empty std::tuple<...> to a narrow stream.")
@@ -340,7 +340,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto tuple = std::make_tuple();
         std::cout << tuple << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "<>" });
+        REQUIRE(narrow_buffer.str() == "<>");
     }
 
     SECTION("Printing an empty std::tuple<...> to a wide stream.")
@@ -348,7 +348,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto tuple = std::make_tuple();
         std::wcout << tuple << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"<>" });
+        REQUIRE(wide_buffer.str() == L"<>");
     }
 
     SECTION("Printing a populated std::tuple<...> to a narrow stream.")
@@ -356,7 +356,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
         std::cout << tuple << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "<1, 2, 3, 4, 5>" });
+        REQUIRE(narrow_buffer.str() == "<1, 2, 3, 4, 5>");
     }
 
     SECTION("Printing a populated std::tuple<...> to a wide stream.")
@@ -364,7 +364,7 @@ TEST_CASE("Printing of Standard Library Containers")
         const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
         std::wcout << tuple << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"<1, 2, 3, 4, 5>" });
+        REQUIRE(wide_buffer.str() == L"<1, 2, 3, 4, 5>");
     }
 }
 
@@ -385,8 +385,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << map << std::flush;
 
-        REQUIRE(
-            narrow_buffer.str() == std::string{ "[(1, Template), (2, Meta), (3, Programming)]" });
+        REQUIRE(narrow_buffer.str() == "[(1, Template), (2, Meta), (3, Programming)]");
     }
 
     SECTION("Printing a populated std::map<...> to a wide stream.")
@@ -397,8 +396,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::wcout << map << std::flush;
 
-        REQUIRE(
-            wide_buffer.str() == std::wstring{ L"[(1, Template), (2, Meta), (3, Programming)]" });
+        REQUIRE(wide_buffer.str() == L"[(1, Template), (2, Meta), (3, Programming)]");
     }
 
     SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
@@ -409,7 +407,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << vector << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "[<1, 0.1, Hello>, <2, 0.2, World>]" });
+        REQUIRE(narrow_buffer.str() == "[<1, 0.1, Hello>, <2, 0.2, World>]");
     }
 
     SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
@@ -420,7 +418,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::wcout << vector << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"[<1, 0.1, Hello>, <2, 0.2, World>]" });
+        REQUIRE(wide_buffer.str() == L"[<1, 0.1, Hello>, <2, 0.2, World>]");
     }
 
     SECTION("Printing a populated std::pair<int, std::vector<std::pair<std::string, std::string>>>")
@@ -431,7 +429,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << pair << std::flush;
 
-        REQUIRE(narrow_buffer.str() == std::string{ "(10, [(Why, Not?), (Someone, Might!)])" });
+        REQUIRE(narrow_buffer.str() == "(10, [(Why, Not?), (Someone, Might!)])");
     }
 }
 
@@ -448,27 +446,24 @@ TEST_CASE("Printing with Custom Formatters")
     SECTION("Printing a populated std::vector<...> to a wide stream.")
     {
         const auto container = std::vector<int>{ 1, 2, 3, 4 };
-
         container_printer::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
     }
 
     SECTION("Printing a populated std::tuple<...> to a wide stream.")
     {
         const auto container = std::make_tuple(1, 2, 3, 4);
-
         container_printer::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"$$ 1 | 2 | 3 | 4 $$" });
+        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
     }
 
     SECTION("Printing a populated std::pair<...> to a wide stream.")
     {
         const auto container = std::make_pair(1, 2);
-
         container_printer::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
-        REQUIRE(wide_buffer.str() == std::wstring{ L"$$ 1 | 2 $$" });
+        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 $$");
     }
 }
