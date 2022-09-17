@@ -8,63 +8,40 @@
 #include <tuple>
 #include <utility>
 
-/**
- * TBD:
- *   from c++17, add for c++14 support:
- *     - void_t
- *   from c++14, add for c++11 support:
- *     - decay_t
- *     - enable_if_t
- *     - variable templates
- *     - ‘auto’ in lambda parameter declaration
- */
-
-/**
- * 199711L (until C++11),
- * 201103L (C++11),
- * 201402L (C++14),
- * 201703L (C++17),
- * 202002L (C++20)
- */
 
 namespace std {
 
 #if (__cplusplus < 201703L)
 
-#ifndef __cpp_lib_void_t
-#define __cpp_lib_void_t 201411L
-#endif
+#  ifndef __cpp_lib_void_t
 
+#define __cpp_lib_void_t 201411L
 template<typename...>
 using void_t = void;
+
+#  endif
 
 #endif
 
 #if (__cplusplus < 201402L)
 
+// No feature test macro found for decay_t.
 template<class T>
 using decay_t = typename decay<T>::type;
 
+// No feature test macro found for enable_if_t.
 template< bool B, class T = void >
 using enable_if_t = typename enable_if<B,T>::type;
 
-/*
-STL_container_iostream_ops.hh:137:16: error: variable templates only available
-    with ‘-std=c++14’ or ‘-std=gnu++14’ [-Werror]
-  150 | constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
-      |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-STL_container_iostream_ops.hh: In function ‘StreamType& container_printer::to_stream(
-    StreamType&, const ContainerType&, const FormatterType&)’:
-STL_container_iostream_ops.hh:403:75: error: use of ‘auto’ in lambda parameter
-    declaration only available with ‘-std=c++14’ or ‘-std=gnu++14’
-  416 |     std::for_each(begin, std::end(container), [&stream, &formatter](const auto& element) {
-      |
-*/
+// Use of variable template is_printable_as_container_v below ellided by
+//   testing for feature test macro __cpp_variable_templates.
+
+// Use of generic lambda in to_stream(not tuple or pair) below ellided by
+//   testing for feature test macro __cpp_generic_lambdas.
 
 #endif
 
 }  // namespace std
-
 
 
 namespace container_printer {
@@ -139,8 +116,10 @@ struct is_printable_as_container<
 /**
  * @brief Helper variable template.
  */
+#ifdef __cpp_variable_templates
 template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
+#endif
 
 } // namespace traits
 
@@ -419,7 +398,12 @@ static StreamType& to_stream(
 
     std::advance(begin, 1);
 
-    std::for_each(begin, std::end(container), [&stream, &formatter](const auto& element) {
+    std::for_each(begin, std::end(container),
+#ifdef __cpp_generic_lambdas
+                  [&stream, &formatter](const auto& element) {
+#else
+                  [&stream, &formatter](const typename ContainerType::value_type& element) {
+#endif
         formatter.print_delimiter(stream);
         formatter.print_element(stream, element);
     });
@@ -436,7 +420,12 @@ static StreamType& to_stream(
  */
 template <typename ContainerType, typename StreamType>
 auto operator<<(StreamType& stream, const ContainerType& container) -> std::enable_if_t<
-    container_printer::traits::is_printable_as_container_v<ContainerType>, StreamType&>
+#ifdef __cpp_variable_templates
+    container_printer::traits::is_printable_as_container_v<ContainerType>,
+#else
+    container_printer::traits::is_printable_as_container<ContainerType>::value,
+#endif
+    StreamType&>
 {
     using formatter_type = container_printer::default_formatter<ContainerType, StreamType>;
     container_printer::to_stream(stream, container, formatter_type{});
