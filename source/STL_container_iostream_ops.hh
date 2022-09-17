@@ -75,7 +75,8 @@ namespace traits {
  * @brief Base case for the testing of STL compatible container types.
  */
 template <typename Type, typename = void>
-struct is_printable_as_container : public std::false_type {};
+struct is_printable_as_container : public std::false_type
+{};
 
 /**
  * @brief Specialization to ensure that Standard Library compatible containers that have
@@ -86,39 +87,45 @@ struct is_printable_as_container<
     Type, std::void_t<
               typename Type::iterator, decltype(std::declval<Type&>().begin()),
               decltype(std::declval<Type&>().end()), decltype(std::declval<Type&>().empty())>>
-    : public std::true_type {};
+    : public std::true_type
+{};
 
 /**
  * @brief Specialization to treat std::pair<...> as a printable container type.
  */
 template <typename FirstType, typename SecondType>
-struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type {};
+struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
+{};
 
 /**
  * @brief Specialization to treat std::tuple<...> as a printable container type.
  */
 template <typename... Args>
-struct is_printable_as_container<std::tuple<Args...>> : public std::true_type {};
+struct is_printable_as_container<std::tuple<Args...>> : public std::true_type
+{};
 
 /**
  * @brief Specialization to treat arrays as printable container types.
  */
 template <typename ArrayType, std::size_t ArraySize>
-struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type {};
+struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
+{};
 
 /**
  * @brief Narrow character array specialization meant to ensure that we print character arrays
  * as strings and not as delimiter containers of individual characters.
  */
 template <std::size_t ArraySize>
-struct is_printable_as_container<char[ArraySize]> : public std::false_type {};
+struct is_printable_as_container<char[ArraySize]> : public std::false_type
+{};
 
 /**
  * @brief Wide character array specialization meant to ensure that we print character arrays
  * as strings and not as delimiter containers of individual characters.
  */
 template <std::size_t ArraySize>
-struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type {};
+struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
+{};
 
 /**
  * @brief String specialization meant to ensure that we treat strings as nothing more than
@@ -127,8 +134,7 @@ struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type {}
 template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
 struct is_printable_as_container<
     std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
-{
-};
+{};
 
 /**
  * @brief Helper variable template.
@@ -144,7 +150,8 @@ namespace decorator {
  * @brief Struct to neatly wrap up all the additional characters we'll need in order to
  * print out the containers.
  */
-template <typename CharacterType> struct wrapper
+template <typename CharacterType>
+struct wrapper
 {
     using type = CharacterType;
 
@@ -156,7 +163,8 @@ template <typename CharacterType> struct wrapper
 /**
  * @brief Base definition for the delimiters. This probably won't ever get invoked.
  */
-template <typename /*ContainerType*/, typename CharacterType> struct delimiters
+template <typename /*ContainerType*/, typename CharacterType>
+struct delimiters
 {
     using type = wrapper<CharacterType>;
 
@@ -167,7 +175,8 @@ template <typename /*ContainerType*/, typename CharacterType> struct delimiters
  * @brief Default narrow character specialization for any container type that isn't even
  * more specialized.
  */
-template <typename ContainerType> struct delimiters<ContainerType, char>
+template <typename ContainerType>
+struct delimiters<ContainerType, char>
 {
     using type = wrapper<char>;
 
@@ -178,7 +187,8 @@ template <typename ContainerType> struct delimiters<ContainerType, char>
  * @brief Default wide character specialization for any container type that isn't even
  * more specialized.
  */
-template <typename ContainerType> struct delimiters<ContainerType, wchar_t>
+template <typename ContainerType>
+struct delimiters<ContainerType, wchar_t>
 {
     using type = wrapper<wchar_t>;
 
@@ -242,7 +252,8 @@ struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
 /**
  * @brief Narrow character specialization for std::tuple<...> instances.
  */
-template <typename... DataType> struct delimiters<std::tuple<DataType...>, char>
+template <typename... DataType>
+struct delimiters<std::tuple<DataType...>, char>
 {
     static constexpr wrapper<char> values = { "<", ", ", ">" };
 };
@@ -250,17 +261,20 @@ template <typename... DataType> struct delimiters<std::tuple<DataType...>, char>
 /**
  * @brief Wide character specialization for std::tuple<...> instances.
  */
-template <typename... DataType> struct delimiters<std::tuple<DataType...>, wchar_t>
+template <typename... DataType>
+struct delimiters<std::tuple<DataType...>, wchar_t>
 {
     static constexpr wrapper<wchar_t> values = { L"<", L", ", L">" };
 };
+
 } // namespace decorator
 
 /**
- * @brief Default container formatter that will be used to print prefix, element, separator, and
- * suffix strings to an output stream.
+ * @brief Default container formatter that will be used to print prefix,
+ * element, separator, and suffix strings to an output stream.
  */
-template <typename ContainerType, typename StreamType> struct default_formatter
+template <typename ContainerType, typename StreamType>
+struct default_formatter
 {
     static constexpr auto decorators = container_printer::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
@@ -290,7 +304,8 @@ template <typename ContainerType, typename StreamType> struct default_formatter
 /**
  * @brief Helper function to determine if a container is empty.
  */
-template <typename ContainerType> bool is_empty(const ContainerType& container) noexcept
+template <typename ContainerType>
+bool is_empty(const ContainerType& container) noexcept
 {
     return container.empty();
 }
@@ -307,7 +322,8 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 /**
  * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
  */
-template <typename TupleType, std::size_t Index, std::size_t Last> struct tuple_handler
+template <typename TupleType, std::size_t Index, std::size_t Last>
+struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
     static void
@@ -329,15 +345,15 @@ struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
     static void print(
         StreamType& /*stream*/, const TupleType& /*tuple*/,
         const FormatterType& /*formatter*/) noexcept
-    {
-    }
+    {}
 };
 
 /**
  * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
  * object.
  */
-template <typename TupleType, std::size_t Index> struct tuple_handler<TupleType, Index, Index>
+template <typename TupleType, std::size_t Index>
+struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
     static void
@@ -352,7 +368,8 @@ template <typename TupleType, std::size_t Index> struct tuple_handler<TupleType,
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& to_stream(
-    StreamType& stream, const std::tuple<TupleArgs...>& container, const FormatterType& formatter)
+    StreamType& stream, const std::tuple<TupleArgs...>& container,
+    const FormatterType& formatter)
 {
     using ContainerType = std::decay_t<decltype(container)>;
 
@@ -385,8 +402,9 @@ static StreamType& to_stream(
  * and forward-iterability.
  */
 template <typename ContainerType, typename StreamType, typename FormatterType>
-static StreamType&
-to_stream(StreamType& stream, const ContainerType& container, const FormatterType& formatter)
+static StreamType& to_stream(
+    StreamType& stream, const ContainerType& container,
+    const FormatterType& formatter)
 {
     formatter.print_prefix(stream);
 
@@ -410,6 +428,7 @@ to_stream(StreamType& stream, const ContainerType& container, const FormatterTyp
 
     return stream;
 }
+
 } // namespace container_printer
 
 /**
