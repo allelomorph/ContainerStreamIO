@@ -44,7 +44,7 @@ using enable_if_t = typename enable_if<B,T>::type;
 }  // namespace std
 
 
-namespace container_printer {
+namespace container_stream_io {
 
 namespace traits {
 
@@ -248,6 +248,8 @@ struct delimiters<std::tuple<DataType...>, wchar_t>
 
 } // namespace decorator
 
+namespace output {
+
 /**
  * @brief Default container formatter that will be used to print prefix,
  * element, separator, and suffix strings to an output stream.
@@ -255,7 +257,7 @@ struct delimiters<std::tuple<DataType...>, wchar_t>
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
-    static constexpr auto decorators = container_printer::decorator::delimiters<
+    static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
 
     static void print_prefix(StreamType& stream) noexcept
@@ -413,7 +415,13 @@ static StreamType& to_stream(
     return stream;
 }
 
-} // namespace container_printer
+} // namespace output
+
+namespace input {
+
+} // namespace input
+
+} // namespace container_stream_io
 
 /**
  * @brief Overload of the stream output operator for compatible containers.
@@ -421,14 +429,15 @@ static StreamType& to_stream(
 template <typename ContainerType, typename StreamType>
 auto operator<<(StreamType& stream, const ContainerType& container) -> std::enable_if_t<
 #ifdef __cpp_variable_templates
-    container_printer::traits::is_printable_as_container_v<ContainerType>,
+    container_stream_io::traits::is_printable_as_container_v<ContainerType>,
 #else
-    container_printer::traits::is_printable_as_container<ContainerType>::value,
+    container_stream_io::traits::is_printable_as_container<ContainerType>::value,
 #endif
     StreamType&>
 {
-    using formatter_type = container_printer::default_formatter<ContainerType, StreamType>;
-    container_printer::to_stream(stream, container, formatter_type{});
+    using formatter_type =
+        container_stream_io::output::default_formatter<ContainerType, StreamType>;
+    container_stream_io::output::to_stream(stream, container, formatter_type{});
 
     return stream;
 }
