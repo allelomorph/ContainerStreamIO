@@ -42,3 +42,9 @@
 build/*
 .vscode/*
 .vs/*
+
+# emacs
+#   backup files
+*~
+#   autosave files
+\#*\#
