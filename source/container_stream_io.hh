@@ -8,6 +8,17 @@
 #include <tuple>
 #include <utility>
 
+// Temporary includes for from_stream overloads
+//#include <array>
+#include <vector>
+//#include <deque>
+//#include <forward_list>
+//#include <list>
+//#include <map>
+//#include <unordered_set>
+//#include <unordered_map>
+//#include <stack>
+//#include <queue>
 
 namespace std {
 
@@ -47,6 +58,85 @@ using enable_if_t = typename enable_if<B,T>::type;
 namespace container_stream_io {
 
 namespace traits {
+
+/**
+ * @brief Base case for the testing of STL compatible container types.
+ */
+template <typename Type, typename = void>
+struct is_parseable_as_container : public std::false_type
+{};
+
+/**
+ * @brief Specialization to ensure that Standard Library compatible containers that have
+ * `begin()`, `end()`, and `empty()` member functions are treated as parseable containers.
+ */
+template <typename Type>
+struct is_parseable_as_container<
+    Type, std::void_t<
+              typename Type::iterator, decltype(std::declval<Type&>().begin()),
+              decltype(std::declval<Type&>().end()), decltype(std::declval<Type&>().empty())>>
+    : public std::true_type
+{};
+
+/**
+ * @brief Specialization to treat std::pair<...> as a parseable container type.
+ */
+/*
+template <typename FirstType, typename SecondType>
+struct is_parseable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
+{};
+*/
+
+/**
+ * @brief Specialization to treat std::tuple<...> as a parseable container type.
+ */
+/*
+template <typename... Args>
+struct is_parseable_as_container<std::tuple<Args...>> : public std::true_type
+{};
+*/
+
+/**
+ * @brief Specialization to treat arrays as parseable container types.
+ */
+/*
+template <typename ArrayType, std::size_t ArraySize>
+struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
+{};
+*/
+
+/**
+ * @brief Narrow character array specialization meant to ensure that we print character arrays
+ * as strings and not as delimiter containers of individual characters.
+ */
+template <std::size_t ArraySize>
+struct is_parseable_as_container<char[ArraySize]> : public std::false_type
+{};
+
+/**
+ * @brief Wide character array specialization meant to ensure that we print character arrays
+ * as strings and not as delimiter containers of individual characters.
+ */
+template <std::size_t ArraySize>
+struct is_parseable_as_container<wchar_t[ArraySize]> : public std::false_type
+{};
+
+/**
+ * @brief String specialization meant to ensure that we treat strings as nothing more than
+ * strings.
+ */
+template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
+struct is_parseable_as_container<
+    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
+{};
+
+/**
+ * @brief Helper variable template.
+ */
+#ifdef __cpp_variable_templates
+template <typename Type>
+constexpr bool is_parseable_as_container_v = is_parseable_as_container<Type>::value;
+#endif
 
 /**
  * @brief Base case for the testing of STL compatible container types.
@@ -135,7 +225,7 @@ struct wrapper
     using type = CharacterType;
 
     const type* prefix;
-    const type* separator;
+    const type* separator;  // termed delimiter elsewhere
     const type* suffix;
 };
 
@@ -419,6 +509,105 @@ static StreamType& to_stream(
 
 namespace input {
 
+// Will first be adding specific overloads of from_stream() for each container
+//   supported, which will result initially in much redundant code. Then will
+//   try to mimic Severeijns' metaprogramming generalizations to consolidate
+//   those overloads around the different container element insertion methods:
+//
+// pair:
+//   p.first = elem1;
+//   p.second = elem2;
+//     or
+//   std::make_pair(elem1, elem2);
+//
+// tuple:
+//   (not sure on this one yet - use recursive template like output::tuple_handler,
+//     with variadic function that returns std::make_tuple(args)?)
+//
+// array:
+//   a[i] = elem;
+//
+// forward_list:
+//   fl.emplace_after(fl.end(), elem);
+//
+// vector:
+// deque:
+// list:
+//   (in commmon: have emplace_back)
+//   v/d/l.emplace_back(elem);
+//
+// set:
+// multiset:
+// unordered_set:
+// unordered_multiset:
+//   (in common: have key_type, but no operator[])
+//   s/ms/us/ums.emplace(elem); (in non-multisets, redundant keys in serialization are ignored)
+//
+// map:
+// multimap:
+// unordered_map:
+// unordered_multimap:
+//   (in common: have key_type and operator[])
+//   parse pair, then
+//   m/mm/um/umm.emplace(elem1, elem2); (in non-multimaps, redundant keys in
+//       serialization will have first value)
+//     or
+//   m/mm/um/umm.emplace(std::make_pair(elem1, elem2)); (same behavior for emplace(elem1, elem2))
+//     or
+//   parse pair, then
+//   m/mm/um/umm[pair.first] = pair.second; (in non-multimaps, redundant keys in
+//       serialization will have last value)
+//
+//   (maybe set failbit if redundant keys deserialized for non-multimaps?)
+
+// prototype adapted from vector_stream_ops.hh
+//
+// TBD:
+//   - add support for multichar delimiters
+//     - may need templated strlen to handle both char and wchar_t
+//   - modularize with an input version of default_formatter
+//     - may need a version of getline that supports multichar delimiters
+/**
+ * @brief Overload for vector parsing.
+ */
+template <typename /*ContainerType*/ElementType, typename StreamType/*, typename FormatterType*/>
+static StreamType& from_stream(
+    StreamType& istream, std::vector<ElementType>& container/*,
+    const FormatterType& formatter*/)
+{
+    auto decorators = container_stream_io::decorator::delimiters<
+        /*ContainerType*/std::vector<ElementType>, typename StreamType::char_type>::values;
+
+    istream >> std::ws;
+    if (istream.get() != decorators.prefix[0]) {  // '['
+        istream.setstate(std::ios_base::failbit);
+        return istream;
+    }
+    istream >> std::ws;
+    std::vector<ElementType> new_v;
+    ElementType temp;
+    for (char peek(istream.peek()); istream.good() && peek != decorators.suffix[0];) {  // ']'
+        istream >> temp;
+        if (istream.fail() && !istream.eof())
+            return istream;
+        new_v.emplace_back(temp);
+        istream >> std::ws;
+        peek = istream.peek();
+        if (istream.eof() || (
+                peek != decorators.separator[0] && peek != decorators.suffix[0])) {  // ',' ']'
+            istream.setstate(std::ios_base::failbit);
+            return istream;
+        }
+        if (peek == decorators.separator[0])  // ','
+            istream.get();
+        istream >> std::ws;
+    }
+    istream.get();  // consume ']'
+    if (!istream.fail() || istream.eof())
+        container = std::move(new_v);
+    return istream;
+}
+
 } // namespace input
 
 } // namespace container_stream_io
@@ -427,7 +616,7 @@ namespace input {
  * @brief Overload of the stream output operator for compatible containers.
  */
 template <typename ContainerType, typename StreamType>
-auto operator<<(StreamType& stream, const ContainerType& container) -> std::enable_if_t<
+auto operator<<(StreamType& ostream, const ContainerType& container) -> std::enable_if_t<
 #ifdef __cpp_variable_templates
     container_stream_io::traits::is_printable_as_container_v<ContainerType>,
 #else
@@ -437,7 +626,26 @@ auto operator<<(StreamType& stream, const ContainerType& container) -> std::enab
 {
     using formatter_type =
         container_stream_io::output::default_formatter<ContainerType, StreamType>;
-    container_stream_io::output::to_stream(stream, container, formatter_type{});
+    container_stream_io::output::to_stream(ostream, container, formatter_type{});
 
-    return stream;
+    return ostream;
+}
+
+/**
+ * @brief Overload of the stream output operator for compatible containers.
+ */
+template <typename ContainerType, typename StreamType>
+auto operator>>(StreamType& istream, ContainerType& container) -> std::enable_if_t<
+#ifdef __cpp_variable_templates
+    container_stream_io::traits::is_parseable_as_container_v<ContainerType>,
+#else
+    container_stream_io::traits::is_parseable_as_container<ContainerType>::value,
+#endif
+    StreamType&>
+{
+    //using formatter_type =
+    //    container_stream_io::input::default_formatter<ContainerType, StreamType>;
+    container_stream_io::input::from_stream(istream, container/*, formatter_type{}*/);
+
+    return istream;
 }
