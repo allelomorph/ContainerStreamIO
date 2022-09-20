@@ -494,7 +494,7 @@ static StreamType& to_stream(
 #ifdef __cpp_generic_lambdas
                   [&stream, &formatter](const auto& element) {
 #else
-                  [&stream, &formatter](const typename ContainerType::value_type& element) {
+                  [&stream, &formatter](const decltype(*begin)& element) {
 #endif
         formatter.print_delimiter(stream);
         formatter.print_element(stream, element);
