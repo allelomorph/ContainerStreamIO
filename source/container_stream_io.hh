@@ -585,19 +585,174 @@ namespace input {
 //     or
 //   m/mm/um/umm.emplace(std::make_pair(elem1, elem2)); (same behavior for emplace(elem1, elem2))
 //     or
-//   parse pair, then
+//   m/mm/um/umm.emplace(parsed pair); (same behavior for emplace(elem1, elem2))
+//     or
 //   m/mm/um/umm[pair.first] = pair.second; (in non-multimaps, redundant keys in
 //       serialization will have last value)
 //
 //   (maybe set failbit if redundant keys deserialized for non-multimaps?)
 
-// prototype adapted from vector_stream_ops.hh
-//
-// TBD:
-//   - add support for multichar delimiters
-//     - may need templated strlen to handle both char and wchar_t
-//   - modularize with an input version of default_formatter
-//     - may need a version of getline that supports multichar delimiters
+template <typename ContainerType, typename StreamType>
+struct default_formatter
+{
+    static constexpr auto decorators = container_stream_io::decorator::delimiters<
+        ContainerType, typename StreamType::char_type>::values;
+
+    static void parse_prefix(StreamType& istream) noexcept
+    {
+        extract_token(istream, decorators.prefix);
+    }
+
+    template <typename ElementType>
+    static void parse_element(StreamType& istream, ElementType& element) noexcept
+    {
+        istream >> std::ws >> element;
+    }
+
+    template <std::size_t ArraySize>
+    static void parse_element(StreamType& stream, const char element[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template <std::size_t ArraySize>
+    static void parse_element(StreamType& stream, const wchar_t element[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template<typename CharacterType>
+    static void parse_element(StreamType& stream,
+                              const std::basic_string<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#if (__cplusplus >= 201703L)
+    template<typename CharacterType>
+    static void parse_element(StreamType& stream,
+                              const std::basic_string_view<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#endif
+
+    // TBD: try to consolidate all the insert_element overloads with metaprogramming
+    /*
+    static void insert_element(std::forward_list<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace_after(container.end(), element);
+    }
+    */
+    template <typename ElementType>
+    static void insert_element(std::vector<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace_back(element);
+    }
+/*
+    template <typename ElementType>
+    static void insert_element(std::deque<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace_back(element);
+    }
+
+    template <typename ElementType>
+    static void insert_element(std::list<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace_back(element);
+    }
+*/
+/*
+    static void insert_element(std::set<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace(element);
+    }
+
+    static void insert_element(std::multiset<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace(element);
+    }
+
+    static void insert_element(std::unordered_set<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace(element);
+    }
+    static void insert_element(std::unordered_multiset<ElementType>& container, const ElementType& element) noexcept
+    {
+        container.emplace(element);
+    }
+*/
+/*
+    template<typename KeyType, typename ValueType>
+    static void insert_element(std::map<KeyType, ValueType>& container,
+                               const std::pair<KeyType, ValueType>& element) noexcept
+    {
+        container.emplace(element);
+    }
+
+    static void insert_element(std::multimap<KeyType, ValueType>& container,
+                               const std::pair<KeyType, ValueType>& element) noexcept
+    {
+        container.emplace(element);
+    }
+
+    static void insert_element(std::unordered_map<KeyType, ValueType>& container,
+                               const std::pair<KeyType, ValueType>& element) noexcept
+    {
+        container.emplace(element);
+    }
+
+    static void insert_element(std::unordered_multimap<KeyType, ValueType>& container,
+                               const std::pair<KeyType, ValueType>& element) noexcept
+    {
+        container.emplace(element);
+    }
+*/
+    static void parse_delimiter(StreamType& istream) noexcept
+    {
+        extract_token(istream, decorators.delimiter);
+    }
+
+    static void parse_suffix(StreamType& istream) noexcept
+    {
+        extract_token(istream, decorators.suffix);
+    }
+};
+
+template <typename CharacterType>
+static void extract_token(
+    std::basic_istream<CharacterType>& istream, const CharacterType *token) {
+    if (token == nullptr) {
+        istream.setstate(std::ios_base::failbit);
+        return;
+    }
+    auto token_s {
+#if (__cplusplus >= 201703L)
+        std::string_view{token}
+#else
+        std::string{token}
+#endif
+    };
+    if (token_s.size() == 0) {
+        istream.setstate(std::ios_base::failbit);
+        return;
+    }
+    istream >> std::ws;
+    auto it_1 {token_s.begin()};
+    while (!istream.eof() && it_1 != token_s.end() && istream.peek() == *it_1) {
+        istream.get();
+        ++it_1;
+    }
+    if (it_1 != token_s.end()) {
+        // only partial delim match, return chars to stream
+        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
+            istream.putback(*it_2);
+        istream.setstate(std::ios_base::failbit);
+    }
+    return;
+}
+
 /**
  * @brief Overload for vector parsing.
  */
