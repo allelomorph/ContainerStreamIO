@@ -1,6 +1,6 @@
 #pragma once
 
-#include <algorithm>
+#include <algorithm>  // copy
 #include <cstddef>
 #include <iostream>
 #include <set>
@@ -21,6 +21,7 @@
 //#include <queue>
 
 #include <iomanip>  // quoted
+#include <iterator>  // begin, end
 
 namespace std {
 
@@ -592,6 +593,39 @@ namespace input {
 //
 //   (maybe set failbit if redundant keys deserialized for non-multimaps?)
 
+template <typename CharacterType>
+static void extract_token(
+    std::basic_istream<CharacterType>& istream, const CharacterType *token) {
+    if (token == nullptr) {
+        istream.setstate(std::ios_base::failbit);
+        return;
+    }
+    auto token_s {
+#if (__cplusplus >= 201703L)
+        std::string_view{token}
+#else
+        std::string{token}
+#endif
+    };
+    // no check for size of 0 needed, as then begin() == end()
+    istream >> std::ws;
+    auto it_1 {token_s.begin()};
+    while (!istream.eof() && it_1 != token_s.end() && istream.peek() == *it_1) {
+        istream.get();
+        //std::cout << "\textract_token: get(): '" << static_cast<CharacterType>(istream.get()) <<  "'\n";
+        ++it_1;
+    }
+    if (it_1 != token_s.end()) {
+        // only partial delim match, return chars to stream
+        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2) {
+            // std::cout << "\textract_token: putback(): '" << *it_2 <<  "'\n";
+            istream.putback(*it_2);
+        }
+        istream.setstate(std::ios_base::failbit);
+    }
+    return;
+}
+
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
@@ -610,30 +644,47 @@ struct default_formatter
     }
 
     template <std::size_t ArraySize>
-    static void parse_element(StreamType& stream, const char element[ArraySize]) noexcept
+    static void parse_element(StreamType& istream, char (&element)[ArraySize]) noexcept
     {
-        stream << std::quoted(element);
+        // can only use quoted with operator>> when target is string, not C-array
+        std::string s;
+        istream >> std::ws >> std::quoted(s);
+        if (s.size() != ArraySize) {
+            istream.setstate(std::ios_base::failbit);
+            return;
+        }
+        std::copy(s.begin(), s.end(), std::begin(element));
     }
 
     template <std::size_t ArraySize>
-    static void parse_element(StreamType& stream, const wchar_t element[ArraySize]) noexcept
+    static void parse_element(StreamType& istream, wchar_t (&element)[ArraySize]) noexcept
     {
-        stream << std::quoted(element);
+        // can only use quoted with operator>> when target is string, not C-array
+        std::wstring s;
+        istream >> std::ws >> std::quoted(s);
+        if (s.size() != ArraySize) {
+            istream.setstate(std::ios_base::failbit);
+            return;
+        }
+        std::copy(s.begin(), s.end(), std::begin(element));
     }
 
     template<typename CharacterType>
-    static void parse_element(StreamType& stream,
-                              const std::basic_string<CharacterType>& element) noexcept
+    static void parse_element(StreamType& istream,
+                              std::basic_string<CharacterType>& element) noexcept
     {
-        stream << std::quoted(element);
+        istream >> std::ws >> std::quoted(element);
     }
 
 #if (__cplusplus >= 201703L)
     template<typename CharacterType>
-    static void parse_element(StreamType& stream,
-                              const std::basic_string_view<CharacterType>& element) noexcept
+    static void parse_element(StreamType& istream,
+                              std::basic_string_view<CharacterType>& element) noexcept
     {
-        stream << std::quoted(element);
+        // can only use quoted with operator>> when target is string, not string_view
+        std::basic_string<CharacterType> s;
+        istream >> std::ws >> std::quoted(s);
+        element = std::basic_string_view<CharacterType> {s.c_str()};
     }
 
 #endif
@@ -720,77 +771,76 @@ struct default_formatter
     }
 };
 
-template <typename CharacterType>
-static void extract_token(
-    std::basic_istream<CharacterType>& istream, const CharacterType *token) {
-    if (token == nullptr) {
-        istream.setstate(std::ios_base::failbit);
-        return;
-    }
-    auto token_s {
-#if (__cplusplus >= 201703L)
-        std::string_view{token}
-#else
-        std::string{token}
-#endif
-    };
-    if (token_s.size() == 0) {
-        istream.setstate(std::ios_base::failbit);
-        return;
-    }
-    istream >> std::ws;
-    auto it_1 {token_s.begin()};
-    while (!istream.eof() && it_1 != token_s.end() && istream.peek() == *it_1) {
-        istream.get();
-        ++it_1;
-    }
-    if (it_1 != token_s.end()) {
-        // only partial delim match, return chars to stream
-        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
-            istream.putback(*it_2);
-        istream.setstate(std::ios_base::failbit);
-    }
-    return;
-}
 
-/**
- * @brief Overload for vector parsing.
- */
-template <typename /*ContainerType*/ElementType, typename StreamType/*, typename FormatterType*/>
+template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
-    StreamType& istream, std::vector<ElementType>& container/*,
-    const FormatterType& formatter*/)
+    StreamType& istream, ContainerType& container,
+    const FormatterType& formatter)
 {
-    auto decorators = container_stream_io::decorator::delimiters<
-        /*ContainerType*/std::vector<ElementType>, typename StreamType::char_type>::values;
-
-    istream >> std::ws;
-    if (istream.get() != decorators.prefix[0]) {  // '['
-        istream.setstate(std::ios_base::failbit);
+    formatter.parse_prefix(istream);
+    if (!istream.good()) {
+        //std::cout << "parse_prefix fail\n";
         return istream;
     }
-    istream >> std::ws;
-    std::vector<ElementType> new_v;
-    ElementType temp;
-    for (char peek(istream.peek()); istream.good() && peek != decorators.suffix[0];) {  // ']'
-        istream >> temp;
-        if (istream.fail() && !istream.eof())
+
+    ContainerType new_container;
+    // value_type should work for most non-C_array, tuple, pair containers
+    // (value_type for maps is pair)
+    typename ContainerType::value_type temp_elem;
+
+    // parse suffix to check for empty container
+    formatter.parse_suffix(istream);
+    if (!istream.bad()) {
+        if (!istream.fail()) {
+            //std::cout << "first parse_suffix succeed\n";
+            container.clear();
             return istream;
-        new_v.emplace_back(temp);
-        istream >> std::ws;
-        peek = istream.peek();
-        if (istream.eof() || (
-                peek != decorators.delimiter[0] && peek != decorators.suffix[0])) {  // ',' ']'
-            istream.setstate(std::ios_base::failbit);
+        } else {
+            //std::cout << "first parse_suffix fail\n";
+            // will reattempt with element
+            istream.clear();
+        }
+    }
+
+    // parse first element
+    formatter.parse_element(istream, temp_elem);
+    if (!istream.good()) {
+        //std::cout << "first parse_element fail\n";
+        return istream;
+    }
+    formatter.insert_element(new_container, temp_elem);
+
+    // parse remaining elements
+    while (!istream.eof()) {
+        // parse suffix first to detect end of serialization
+        formatter.parse_suffix(istream);
+        if (!istream.bad()) {
+            if (!istream.fail()) {
+                //std::cout << "loop parse_suffix succeed\n";
+                break;
+            } else {
+                //std::cout << "loop parse_suffix fail\n";
+                // will reattempt with delimiter
+                istream.clear();
+            }
+        }
+
+        formatter.parse_delimiter(istream);
+        if (!istream.good()) {
+            //std::cout << "parse_delimiter fail\n";
             return istream;
         }
-        if (peek == decorators.delimiter[0])  // ','
-            istream.get();
-        istream >> std::ws;
+
+        formatter.parse_element(istream, temp_elem);
+        if (!istream.good()) {
+            //std::cout << "loop parse_element fail\n";
+            return istream;
+        }
+        formatter.insert_element(new_container, temp_elem);
     }
-    istream.get();  // consume ']'
-    if (!istream.fail() || istream.eof())
-        container = std::move(new_v);
+
+    if (!istream.fail() && !istream.bad())
+        container = std::move(new_container);
     return istream;
 }
 
@@ -829,9 +879,9 @@ auto operator>>(StreamType& istream, ContainerType& container) -> std::enable_if
 #endif
     StreamType&>
 {
-    //using formatter_type =
-    //    container_stream_io::input::default_formatter<ContainerType, StreamType>;
-    container_stream_io::input::from_stream(istream, container/*, formatter_type{}*/);
+    using formatter_type =
+        container_stream_io::input::default_formatter<ContainerType, StreamType>;
+    container_stream_io::input::from_stream(istream, container, formatter_type{});
 
     return istream;
 }
