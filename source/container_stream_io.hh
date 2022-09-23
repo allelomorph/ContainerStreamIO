@@ -20,6 +20,8 @@
 //#include <stack>
 //#include <queue>
 
+#include <iomanip>  // quoted
+
 namespace std {
 
 #if (__cplusplus < 201703L)
@@ -362,6 +364,34 @@ struct default_formatter
         stream << element;
     }
 
+    template <std::size_t ArraySize>
+    static void print_element(StreamType& stream, const char element[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template <std::size_t ArraySize>
+    static void print_element(StreamType& stream, const wchar_t element[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template<typename CharacterType>
+    static void print_element(StreamType& stream,
+                              const std::basic_string<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#if (__cplusplus >= 201703L)
+    template<typename CharacterType>
+    static void print_element(StreamType& stream,
+                              const std::basic_string_view<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#endif
     static void print_delimiter(StreamType& stream) noexcept
     {
         stream << decorators.delimiter << decorators.whitespace;
@@ -429,9 +459,9 @@ struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
     static void
-    print(StreamType& stream, const TupleType& tuple, const FormatterType& /*formatter*/) noexcept
+    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
     {
-        stream << std::get<Index>(tuple);
+        formatter.print_element(stream, std::get<Index>(tuple));
     }
 };
 
