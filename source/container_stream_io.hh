@@ -225,7 +225,8 @@ struct wrapper
     using type = CharacterType;
 
     const type* prefix;
-    const type* separator;  // termed delimiter elsewhere
+    const type* delimiter;
+    const type* whitespace;
     const type* suffix;
 };
 
@@ -249,7 +250,7 @@ struct delimiters<ContainerType, char>
 {
     using type = wrapper<char>;
 
-    static constexpr type values = { "[", ", ", "]" };
+    static constexpr type values = { "[", ",", " ", "]" };
 };
 
 /**
@@ -261,7 +262,7 @@ struct delimiters<ContainerType, wchar_t>
 {
     using type = wrapper<wchar_t>;
 
-    static constexpr type values = { L"[", L", ", L"]" };
+    static constexpr type values = { L"[", L",", L" ", L"]" };
 };
 
 /**
@@ -270,7 +271,7 @@ struct delimiters<ContainerType, wchar_t>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
 {
-    static constexpr wrapper<char> values = { "{", ", ", "}" };
+    static constexpr wrapper<char> values = { "{", ",", " ", "}" };
 };
 
 /**
@@ -279,7 +280,7 @@ struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"{", L", ", L"}" };
+    static constexpr wrapper<wchar_t> values = { L"{", L",", L" ", L"}" };
 };
 
 /**
@@ -288,7 +289,7 @@ struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
 {
-    static constexpr wrapper<char> values = { "{", ", ", "}" };
+    static constexpr wrapper<char> values = { "{", ",", " ", "}" };
 };
 
 /**
@@ -297,7 +298,7 @@ struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"{", L", ", L"}" };
+    static constexpr wrapper<wchar_t> values = { L"{", L",", L" ", L"}" };
 };
 
 /**
@@ -306,7 +307,7 @@ struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_
 template <typename FirstType, typename SecondType>
 struct delimiters<std::pair<FirstType, SecondType>, char>
 {
-    static constexpr wrapper<char> values = { "(", ", ", ")" };
+    static constexpr wrapper<char> values = { "(", ",", " ", ")" };
 };
 
 /**
@@ -315,7 +316,7 @@ struct delimiters<std::pair<FirstType, SecondType>, char>
 template <typename FirstType, typename SecondType>
 struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"(", L", ", L")" };
+    static constexpr wrapper<wchar_t> values = { L"(", L",", L" ", L")" };
 };
 
 /**
@@ -324,7 +325,7 @@ struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
 template <typename... DataType>
 struct delimiters<std::tuple<DataType...>, char>
 {
-    static constexpr wrapper<char> values = { "<", ", ", ">" };
+    static constexpr wrapper<char> values = { "<", ",", " ", ">" };
 };
 
 /**
@@ -333,7 +334,7 @@ struct delimiters<std::tuple<DataType...>, char>
 template <typename... DataType>
 struct delimiters<std::tuple<DataType...>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"<", L", ", L">" };
+    static constexpr wrapper<wchar_t> values = { L"<", L",", L" ", L">" };
 };
 
 } // namespace decorator
@@ -363,7 +364,7 @@ struct default_formatter
 
     static void print_delimiter(StreamType& stream) noexcept
     {
-        stream << decorators.separator;
+        stream << decorators.delimiter << decorators.whitespace;
     }
 
     static void print_suffix(StreamType& stream) noexcept
@@ -594,11 +595,11 @@ static StreamType& from_stream(
         istream >> std::ws;
         peek = istream.peek();
         if (istream.eof() || (
-                peek != decorators.separator[0] && peek != decorators.suffix[0])) {  // ',' ']'
+                peek != decorators.delimiter[0] && peek != decorators.suffix[0])) {  // ',' ']'
             istream.setstate(std::ios_base::failbit);
             return istream;
         }
-        if (peek == decorators.separator[0])  // ','
+        if (peek == decorators.delimiter[0])  // ','
             istream.get();
         istream >> std::ws;
     }
