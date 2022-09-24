@@ -23,6 +23,8 @@
 #include <iomanip>  // quoted
 #include <iterator>  // begin, end
 
+#include "TypeName.hh"
+
 namespace std {
 
 #if (__cplusplus < 201703L)
@@ -365,13 +367,13 @@ struct default_formatter
     }
 
     template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const char element[ArraySize]) noexcept
+    static void print_element(StreamType& stream, const char (&element)[ArraySize]) noexcept
     {
         stream << std::quoted(element);
     }
 
     template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const wchar_t element[ArraySize]) noexcept
+    static void print_element(StreamType& stream, const wchar_t (&element)[ArraySize]) noexcept
     {
         stream << std::quoted(element);
     }
@@ -648,11 +650,17 @@ struct default_formatter
         // can only use quoted with operator>> when target is string, not C-array
         std::string s;
         istream >> std::ws >> std::quoted(s);
-        if (s.size() != ArraySize) {
+        if (s.size() > ArraySize - 1) {
             istream.setstate(std::ios_base::failbit);
             return;
         }
-        std::copy(s.begin(), s.end(), std::begin(element));
+        auto arr_it {std::begin(element)};
+        for (const auto &c : s) {
+            *arr_it = c;
+            ++arr_it;
+        }
+        for (auto arr_end {std::end(element)}; arr_it != arr_end; ++arr_it)
+            *arr_it = '\0';
     }
 
     template <std::size_t ArraySize>
@@ -661,11 +669,17 @@ struct default_formatter
         // can only use quoted with operator>> when target is string, not C-array
         std::wstring s;
         istream >> std::ws >> std::quoted(s);
-        if (s.size() != ArraySize) {
+        if (s.size() > ArraySize - 1) {
             istream.setstate(std::ios_base::failbit);
             return;
         }
-        std::copy(s.begin(), s.end(), std::begin(element));
+        auto arr_it {std::begin(element)};
+        for (const auto &c : s) {
+            *arr_it = c;
+            ++arr_it;
+        }
+        for (auto arr_end {std::end(element)}; arr_it != arr_end; ++arr_it)
+            *arr_it = L'\0';
     }
 
     template<typename CharacterType>
@@ -771,6 +785,36 @@ struct default_formatter
 };
 
 
+/*
+// generic non-move-assignable
+template<typename ContainerType>
+auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
+    !std::is_move_assignable<ContainerType>::value, void>
+{
+    target = source;
+}
+*/
+
+// move-assignable (all (?) STL containers?)
+template<typename ContainerType>
+auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
+        std::is_move_assignable<ContainerType>::value, void>
+{
+    target = std::move(source);
+}
+
+template<typename ElementType, std::size_t ArraySize>
+void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
+{
+    auto t_end {std::end(target)};
+    for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
+         t_it != t_end; ++s_it, ++t_it)
+    {
+        safer_assign<ElementType>(*s_it, *t_it);
+    }
+}
+
+
 // requires move assignable elements (not c arrays)
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
@@ -801,9 +845,9 @@ static StreamType& from_stream(
     if (istream.bad() || istream.fail())
         return istream;
 
-    // note: move not valid for C-arrays
-    container.first = std::move(first);
-    container.second = std::move(second);
+    safer_assign(first, container.first);
+    safer_assign(second, container.second);
+
     return istream;
 }
 
@@ -857,6 +901,7 @@ static StreamType& from_stream(
     }
 
     // note: move not valid for C-arrays
+    // not using safer_assign as this overload of from_stream won't take C-arrays
     if (!istream.fail() && !istream.bad())
         container = std::move(new_container);
     return istream;
