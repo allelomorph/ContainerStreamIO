@@ -783,28 +783,19 @@ struct default_formatter
 };
 
 
-/*
-// generic non-move-assignable
+// move-assignable (all (?) STL containers? (including std::array)
 template<typename ContainerType>
-auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
-    !std::is_move_assignable<ContainerType>::value, void>
-{
-    target = source;
-}
-*/
-
-// move-assignable (all (?) STL containers?)
-template<typename ContainerType>
-auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
+static auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
         std::is_move_assignable<ContainerType>::value, void>
 {
     target = std::move(source);
 }
 
 template<typename ElementType, std::size_t ArraySize>
-void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
+static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
 {
     // optimize with C memcpy?
+    // memcpy(&target[0], &source[0], ArraySize * sizeof ElementType);
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
          t_it != t_end; ++s_it, ++t_it)
@@ -813,17 +804,20 @@ void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArrayS
     }
 }
 
-template <typename ElementType, std::size_t ArraySize,
-          typename StreamType, typename FormatterType>
-static StreamType& from_stream(
-    StreamType& istream, ElementType (&container)[ArraySize],
+// tried enable_if with SFINAE struct is_array which would be true for std::array
+//   and C arrays, but it appeared that the resolution of is_array caused the
+//   decay of the C arrays to pointers, so they would then not be recognized as
+//   T[N] by the time they were used in from_stream overload resolution
+template <typename ContainerType, typename StreamType, typename FormatterType>
+static StreamType& array_from_stream(
+    StreamType& istream, ContainerType& container,
     const FormatterType& formatter)
 {
     formatter.parse_prefix(istream);
     if (!istream.good())
         return istream;
 
-    ElementType temp_container[ArraySize];
+    ContainerType temp_container;
     auto tc_it {std::begin(temp_container)};
     auto tc_end {std::end(temp_container)};
 
@@ -847,13 +841,30 @@ static StreamType& from_stream(
         return istream;
     }
 
-    formatter.parse_suffix(istream);  // parse_suffix fails if serialization too long
+    formatter.parse_suffix(istream);  // fails if serialization too long
     if (!istream.bad() && !istream.fail())
         safer_assign(temp_container, container);
     return istream;
 }
 
-// requires move assignable elements (not c arrays)
+template <typename ElementType, std::size_t ArraySize,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, ElementType (&container)[ArraySize],
+    const FormatterType& formatter)
+{
+    return array_from_stream(istream, container, formatter);
+}
+
+template <typename ElementType, std::size_t ArraySize,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, std::array<ElementType, ArraySize>& container,
+    const FormatterType& formatter)
+{
+    return array_from_stream(istream, container, formatter);
+}
+
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -889,7 +900,7 @@ static StreamType& from_stream(
     return istream;
 }
 
-// "generic" overload, but requires value_type, .clear(), move assignment
+// "generic" overload, but requires value_type, .clear(), move assignment of container and elements
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
     StreamType& istream, ContainerType& container,
