@@ -84,11 +84,10 @@ struct is_parseable_as_container<
 /**
  * @brief Specialization to treat std::pair<...> as a parseable container type.
  */
-/*
 template <typename FirstType, typename SecondType>
 struct is_parseable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
 {};
-*/
+
 
 /**
  * @brief Specialization to treat std::tuple<...> as a parseable container type.
@@ -772,73 +771,92 @@ struct default_formatter
 };
 
 
+// requires move assignable elements (not c arrays)
+template <typename FirstType, typename SecondType,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, std::pair<FirstType, SecondType>& container,
+    const FormatterType& formatter)
+{
+    formatter.parse_prefix(istream);
+    if (!istream.good())
+        return istream;
+
+    FirstType first;
+    SecondType second;
+
+    formatter.parse_element(istream, first);
+    if (!istream.good())
+        return istream;
+
+    formatter.parse_delimiter(istream);
+    if (!istream.good())
+        return istream;
+
+    formatter.parse_element(istream, second);
+    if (!istream.good())
+        return istream;
+
+    formatter.parse_suffix(istream);
+    if (istream.bad() || istream.fail())
+        return istream;
+
+    // note: move not valid for C-arrays
+    container.first = std::move(first);
+    container.second = std::move(second);
+    return istream;
+}
+
+// "generic" overload, but requires value_type, .clear(), move assignment
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
     StreamType& istream, ContainerType& container,
     const FormatterType& formatter)
 {
     formatter.parse_prefix(istream);
-    if (!istream.good()) {
-        //std::cout << "parse_prefix fail\n";
+    if (!istream.good())
         return istream;
-    }
 
     ContainerType new_container;
-    // value_type should work for most non-C_array, tuple, pair containers
-    // (value_type for maps is pair)
     typename ContainerType::value_type temp_elem;
 
     // parse suffix to check for empty container
     formatter.parse_suffix(istream);
     if (!istream.bad()) {
         if (!istream.fail()) {
-            //std::cout << "first parse_suffix succeed\n";
             container.clear();
             return istream;
         } else {
-            //std::cout << "first parse_suffix fail\n";
-            // will reattempt with element
             istream.clear();
         }
     }
 
-    // parse first element
     formatter.parse_element(istream, temp_elem);
-    if (!istream.good()) {
-        //std::cout << "first parse_element fail\n";
+    if (!istream.good())
         return istream;
-    }
     formatter.insert_element(new_container, temp_elem);
 
-    // parse remaining elements
     while (!istream.eof()) {
         // parse suffix first to detect end of serialization
         formatter.parse_suffix(istream);
         if (!istream.bad()) {
-            if (!istream.fail()) {
-                //std::cout << "loop parse_suffix succeed\n";
+            if (!istream.fail())
                 break;
-            } else {
-                //std::cout << "loop parse_suffix fail\n";
-                // will reattempt with delimiter
+            else
                 istream.clear();
-            }
         }
 
         formatter.parse_delimiter(istream);
-        if (!istream.good()) {
-            //std::cout << "parse_delimiter fail\n";
+        if (!istream.good())
             return istream;
-        }
 
         formatter.parse_element(istream, temp_elem);
-        if (!istream.good()) {
-            //std::cout << "loop parse_element fail\n";
+        if (!istream.good())
             return istream;
-        }
         formatter.insert_element(new_container, temp_elem);
     }
 
+    // note: move not valid for C-arrays
     if (!istream.fail() && !istream.bad())
         container = std::move(new_container);
     return istream;
