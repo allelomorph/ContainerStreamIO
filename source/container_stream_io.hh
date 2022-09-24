@@ -817,6 +817,11 @@ static StreamType& array_from_stream(
     if (!istream.good())
         return istream;
 
+    if (output::is_empty(container)) {
+        formatter.parse_suffix(istream);
+        return istream;
+    }
+
     ContainerType temp_container;
     auto tc_it {std::begin(temp_container)};
     auto tc_end {std::end(temp_container)};
