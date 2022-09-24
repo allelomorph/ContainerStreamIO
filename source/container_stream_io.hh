@@ -103,11 +103,9 @@ struct is_parseable_as_container<std::tuple<Args...>> : public std::true_type
 /**
  * @brief Specialization to treat arrays as parseable container types.
  */
-/*
 template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
 {};
-*/
 
 /**
  * @brief Narrow character array specialization meant to ensure that we print character arrays
@@ -806,14 +804,54 @@ auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_i
 template<typename ElementType, std::size_t ArraySize>
 void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
 {
+    // optimize with C memcpy?
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
          t_it != t_end; ++s_it, ++t_it)
     {
-        safer_assign<ElementType>(*s_it, *t_it);
+        safer_assign(*s_it, *t_it);
     }
 }
 
+template <typename ElementType, std::size_t ArraySize,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, ElementType (&container)[ArraySize],
+    const FormatterType& formatter)
+{
+    formatter.parse_prefix(istream);
+    if (!istream.good())
+        return istream;
+
+    ElementType temp_container[ArraySize];
+    auto tc_it {std::begin(temp_container)};
+    auto tc_end {std::end(temp_container)};
+
+    formatter.parse_element(istream, *tc_it);
+    if (!istream.good())
+        return istream;
+    ++tc_it;
+
+    for (; !istream.eof() && tc_it != tc_end; ++tc_it) {
+        formatter.parse_delimiter(istream);
+        if (!istream.good())
+            return istream;
+
+        formatter.parse_element(istream, *tc_it);
+        if (!istream.good())
+            return istream;
+    }
+
+    if (tc_it != tc_end) {  // serialization too short
+        istream.setstate(std::ios_base::failbit);
+        return istream;
+    }
+
+    formatter.parse_suffix(istream);  // parse_suffix fails if serialization too long
+    if (!istream.bad() && !istream.fail())
+        safer_assign(temp_container, container);
+    return istream;
+}
 
 // requires move assignable elements (not c arrays)
 template <typename FirstType, typename SecondType,
