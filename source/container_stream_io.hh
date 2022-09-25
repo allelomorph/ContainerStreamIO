@@ -10,7 +10,7 @@
 
 // Temporary includes for from_stream overloads
 //#include <array>
-#include <vector>
+//#include <vector>
 //#include <deque>
 //#include <forward_list>
 //#include <list>
@@ -23,7 +23,7 @@
 #include <iomanip>  // quoted
 #include <iterator>  // begin, end
 
-#include "TypeName.hh"
+// #include "TypeName.hh"
 
 namespace std {
 
@@ -54,6 +54,8 @@ using enable_if_t = typename enable_if<B,T>::type;
 
 // Use of generic lambda in to_stream(not tuple or pair) below ellided by
 //   testing for feature test macro __cpp_generic_lambdas.
+
+// TBD: need to add version of std::quoted for C++11 compatibility
 
 #endif
 
@@ -98,11 +100,9 @@ struct is_parseable_as_container<std::pair<FirstType, SecondType>> : public std:
 /**
  * @brief Specialization to treat std::tuple<...> as a parseable container type.
  */
-/*
 template <typename... Args>
 struct is_parseable_as_container<std::tuple<Args...>> : public std::true_type
 {};
-*/
 
 /**
  * @brief Specialization to treat arrays as parseable container types.
@@ -390,6 +390,72 @@ struct delimiters<std::tuple<DataType...>, wchar_t>
 
 } // namespace decorator
 
+/**
+ * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
+ */
+template <typename TupleType, std::size_t Index, std::size_t Last>
+struct tuple_handler
+{
+    template <typename StreamType, typename FormatterType>
+    static void
+    print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
+    {
+        stream << std::get<Index>(container);
+        formatter.print_delimiter(stream);
+        tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
+    }
+
+    template <typename StreamType, typename FormatterType>
+    static void
+    parse(StreamType& stream, TupleType& container, const FormatterType& formatter)
+    {
+        stream >> std::get<Index>(container);
+        formatter.parse_delimiter(stream);
+        tuple_handler<TupleType, Index + 1, Last>::parse(stream, container, formatter);
+    }
+};
+
+/**
+ * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
+ * object.
+ */
+template <typename TupleType, std::size_t Index>
+struct tuple_handler<TupleType, Index, Index>
+{
+    template <typename StreamType, typename FormatterType>
+    static void
+    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
+    {
+        formatter.print_element(stream, std::get<Index>(tuple));
+    }
+
+    template <typename StreamType, typename FormatterType>
+    static void
+    parse(StreamType& stream, TupleType& tuple, const FormatterType& formatter) noexcept
+    {
+        formatter.parse_element(stream, std::get<Index>(tuple));
+    }
+};
+
+/**
+ * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
+ */
+template <typename TupleType>
+struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
+{
+    template <typename StreamType, typename FormatterType>
+    static void print(
+        StreamType& /*stream*/, const TupleType& /*tuple*/,
+        const FormatterType& /*formatter*/) noexcept
+    {}
+
+    template <typename StreamType, typename FormatterType>
+    static void parse(
+        StreamType& /*stream*/, const TupleType& /*tuple*/,
+        const FormatterType& /*formatter*/) noexcept
+    {}
+};
+
 namespace input {
 
 template <typename CharacterType>
@@ -631,6 +697,26 @@ static StreamType& from_stream(
     return array_from_stream(istream, container, formatter);
 }
 
+/**
+ * @brief Overload to deal with std::tuple<...> objects.
+ */
+template <typename StreamType, typename FormatterType, typename... TupleArgs>
+static StreamType& from_stream(
+    StreamType& stream, std::tuple<TupleArgs...>& container,
+    const FormatterType& formatter)
+{
+    using ContainerType = std::decay_t<decltype(container)>;
+
+    // TBD: currently no checks for stream fails for malformed serialiation,
+    //   modifying tuple directly instead of temp working copy
+    formatter.parse_prefix(stream);
+    container_stream_io::tuple_handler<
+        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(stream, container, formatter);
+    formatter.parse_suffix(stream);
+
+    return stream;
+}
+
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -715,8 +801,6 @@ static StreamType& from_stream(
         formatter.insert_element(new_container, temp_elem);
     }
 
-    // note: move not valid for C-arrays
-    // not using safer_assign as this overload of from_stream won't take C-arrays
     if (!istream.fail() && !istream.bad())
         container = std::move(new_container);
     return istream;
@@ -787,50 +871,6 @@ struct default_formatter
 };
 
 /**
- * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
- */
-template <typename TupleType, std::size_t Index, std::size_t Last>
-struct tuple_handler
-{
-    template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
-    {
-        stream << std::get<Index>(container);
-        formatter.print_delimiter(stream);
-        tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
-    }
-};
-
-/**
- * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
- */
-template <typename TupleType>
-struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
-{
-    template <typename StreamType, typename FormatterType>
-    static void print(
-        StreamType& /*stream*/, const TupleType& /*tuple*/,
-        const FormatterType& /*formatter*/) noexcept
-    {}
-};
-
-/**
- * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
- * object.
- */
-template <typename TupleType, std::size_t Index>
-struct tuple_handler<TupleType, Index, Index>
-{
-    template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
-    {
-        formatter.print_element(stream, std::get<Index>(tuple));
-    }
-};
-
-/**
  * @brief Overload to deal with std::tuple<...> objects.
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
@@ -841,7 +881,8 @@ static StreamType& to_stream(
     using ContainerType = std::decay_t<decltype(container)>;
 
     formatter.print_prefix(stream);
-    tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
+    container_stream_io::tuple_handler<
+        ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
     formatter.print_suffix(stream);
 
     return stream;
