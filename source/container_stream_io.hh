@@ -625,11 +625,43 @@ static void extract_token(
     return;
 }
 
+
+template <typename Type, typename = void>
+struct has_emplace : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_back : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_after : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_after<Type, std::void_t<decltype(std::declval<Type&>().emplace_after())>>
+    : public std::true_type
+{};
+
+
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
+
+    // TBD: maybe instead of templated ElementType for insertion, we tie
+    //   to ContainerType with" `using element_type = typename ContainerType::value_type`
 
     static void parse_prefix(StreamType& istream) noexcept
     {
@@ -699,74 +731,34 @@ struct default_formatter
     }
 
 #endif
-
-    // TBD: try to consolidate all the insert_element overloads with metaprogramming
-    /*
-    static void insert_element(std::forward_list<ElementType>& container, const ElementType& element) noexcept
+/*
+    // std::forward_list
+    template <typename ElementType>
+    static auto insert_element(
+        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
+            input::has_emplace_after<ContainerType>::value &&
+            std::is_move_assignable<ElementType>::value, void>
     {
         container.emplace_after(container.end(), element);
     }
-    */
-    template <typename ElementType>
-    static void insert_element(std::vector<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace_back(element);
-    }
-/*
-    template <typename ElementType>
-    static void insert_element(std::deque<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace_back(element);
-    }
-
-    template <typename ElementType>
-    static void insert_element(std::list<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace_back(element);
-    }
 */
+    // std::vector, std::deque, std::list
+    template<typename ElementType>
+    static auto insert_element(
+        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
+            input::has_emplace_back<ContainerType>::value &&
+            std::is_move_assignable<ElementType>::value, void>
+    {
+        container.emplace_back(element);
+    }
 /*
-    static void insert_element(std::set<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace(element);
-    }
-
-    static void insert_element(std::multiset<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace(element);
-    }
-
-    static void insert_element(std::unordered_set<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace(element);
-    }
-    static void insert_element(std::unordered_multiset<ElementType>& container, const ElementType& element) noexcept
-    {
-        container.emplace(element);
-    }
-*/
-/*
-    template<typename KeyType, typename ValueType>
-    static void insert_element(std::map<KeyType, ValueType>& container,
-                               const std::pair<KeyType, ValueType>& element) noexcept
-    {
-        container.emplace(element);
-    }
-
-    static void insert_element(std::multimap<KeyType, ValueType>& container,
-                               const std::pair<KeyType, ValueType>& element) noexcept
-    {
-        container.emplace(element);
-    }
-
-    static void insert_element(std::unordered_map<KeyType, ValueType>& container,
-                               const std::pair<KeyType, ValueType>& element) noexcept
-    {
-        container.emplace(element);
-    }
-
-    static void insert_element(std::unordered_multimap<KeyType, ValueType>& container,
-                               const std::pair<KeyType, ValueType>& element) noexcept
+    // std::set, std::unordered_set, std::map, std::unordered_map (redundant keys will have first value)
+    // std::multiset, std::unordered_multiset, std::multimap, std::unordered_multimap
+    template <typename ElementType>
+    static auto insert_element(
+        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
+            input::has_emplace::value && !input::has_emplace_back::value &&
+            std::is_move_assignable<ElementType>::value, void>
     {
         container.emplace(element);
     }
@@ -781,7 +773,6 @@ struct default_formatter
         extract_token(istream, decorators.suffix);
     }
 };
-
 
 // move-assignable (all (?) STL containers? (including std::array)
 template<typename ContainerType>
