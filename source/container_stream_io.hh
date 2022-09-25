@@ -71,6 +71,10 @@ template <typename Type, typename = void>
 struct is_parseable_as_container : public std::false_type
 {};
 
+// std::array, std::vector, std::deque
+// std::forward_list, std::list
+// std::(unordered_)(multi)set, std::(unordered_)(multi)map
+// not std::stack, std::queue, std::priority_queue (have empty(), but not begin() and end())
 /**
  * @brief Specialization to ensure that Standard Library compatible containers that have
  * `begin()`, `end()`, and `empty()` member functions are treated as parseable containers.
@@ -213,6 +217,51 @@ template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
 #endif
 
+/**
+ * @brief Helper function to determine if a container is empty.
+ */
+template <typename ContainerType>
+bool is_empty(const ContainerType& container) noexcept
+{
+    return container.empty();
+}
+
+/**
+ * @brief Helper function to test arrays for emptiness.
+ */
+template <typename ArrayType, std::size_t ArraySize>
+constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
+{
+    return ArraySize == 0;
+}
+
+template <typename Type, typename = void>
+struct has_emplace : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_back : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_after : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_after<Type, std::void_t<decltype(std::declval<Type&>().emplace_after())>>
+    : public std::true_type
+{};
+
 } // namespace traits
 
 namespace decorator {
@@ -341,260 +390,11 @@ struct delimiters<std::tuple<DataType...>, wchar_t>
 
 } // namespace decorator
 
-namespace output {
-
-/**
- * @brief Default container formatter that will be used to print prefix,
- * element, separator, and suffix strings to an output stream.
- */
-template <typename ContainerType, typename StreamType>
-struct default_formatter
-{
-    static constexpr auto decorators = container_stream_io::decorator::delimiters<
-        ContainerType, typename StreamType::char_type>::values;
-
-    static void print_prefix(StreamType& stream) noexcept
-    {
-        stream << decorators.prefix;
-    }
-
-    template <typename ElementType>
-    static void print_element(StreamType& stream, const ElementType& element) noexcept
-    {
-        stream << element;
-    }
-
-    template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const char (&element)[ArraySize]) noexcept
-    {
-        stream << std::quoted(element);
-    }
-
-    template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const wchar_t (&element)[ArraySize]) noexcept
-    {
-        stream << std::quoted(element);
-    }
-
-    template<typename CharacterType>
-    static void print_element(StreamType& stream,
-                              const std::basic_string<CharacterType>& element) noexcept
-    {
-        stream << std::quoted(element);
-    }
-
-#if (__cplusplus >= 201703L)
-    template<typename CharacterType>
-    static void print_element(StreamType& stream,
-                              const std::basic_string_view<CharacterType>& element) noexcept
-    {
-        stream << std::quoted(element);
-    }
-
-#endif
-    static void print_delimiter(StreamType& stream) noexcept
-    {
-        stream << decorators.delimiter << decorators.whitespace;
-    }
-
-    static void print_suffix(StreamType& stream) noexcept
-    {
-        stream << decorators.suffix;
-    }
-};
-
-/**
- * @brief Helper function to determine if a container is empty.
- */
-template <typename ContainerType>
-bool is_empty(const ContainerType& container) noexcept
-{
-    return container.empty();
-}
-
-/**
- * @brief Helper function to test arrays for emptiness.
- */
-template <typename ArrayType, std::size_t ArraySize>
-constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
-{
-    return ArraySize == 0;
-}
-
-/**
- * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
- */
-template <typename TupleType, std::size_t Index, std::size_t Last>
-struct tuple_handler
-{
-    template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
-    {
-        stream << std::get<Index>(container);
-        formatter.print_delimiter(stream);
-        tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
-    }
-};
-
-/**
- * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
- */
-template <typename TupleType>
-struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
-{
-    template <typename StreamType, typename FormatterType>
-    static void print(
-        StreamType& /*stream*/, const TupleType& /*tuple*/,
-        const FormatterType& /*formatter*/) noexcept
-    {}
-};
-
-/**
- * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
- * object.
- */
-template <typename TupleType, std::size_t Index>
-struct tuple_handler<TupleType, Index, Index>
-{
-    template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
-    {
-        formatter.print_element(stream, std::get<Index>(tuple));
-    }
-};
-
-/**
- * @brief Overload to deal with std::tuple<...> objects.
- */
-template <typename StreamType, typename FormatterType, typename... TupleArgs>
-static StreamType& to_stream(
-    StreamType& stream, const std::tuple<TupleArgs...>& container,
-    const FormatterType& formatter)
-{
-    using ContainerType = std::decay_t<decltype(container)>;
-
-    formatter.print_prefix(stream);
-    tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
-    formatter.print_suffix(stream);
-
-    return stream;
-}
-
-/**
- * @brief Overload to handle std::pair<...> objects.
- */
-template <typename FirstType, typename SecondType, typename StreamType, typename FormatterType>
-static StreamType& to_stream(
-    StreamType& stream, const std::pair<FirstType, SecondType>& container,
-    const FormatterType& formatter)
-{
-    formatter.print_prefix(stream);
-    formatter.print_element(stream, container.first);
-    formatter.print_delimiter(stream);
-    formatter.print_element(stream, container.second);
-    formatter.print_suffix(stream);
-
-    return stream;
-}
-
-/**
- * @brief Overload to handle containers that support the notion of "emptiness,"
- * and forward-iterability.
- */
-template <typename ContainerType, typename StreamType, typename FormatterType>
-static StreamType& to_stream(
-    StreamType& stream, const ContainerType& container,
-    const FormatterType& formatter)
-{
-    formatter.print_prefix(stream);
-
-    if (is_empty(container)) {
-        formatter.print_suffix(stream);
-
-        return stream;
-    }
-
-    auto begin = std::begin(container);
-    formatter.print_element(stream, *begin);
-
-    std::advance(begin, 1);
-
-    std::for_each(begin, std::end(container),
-#ifdef __cpp_generic_lambdas
-                  [&stream, &formatter](const auto& element) {
-#else
-                  [&stream, &formatter](const decltype(*begin)& element) {
-#endif
-        formatter.print_delimiter(stream);
-        formatter.print_element(stream, element);
-    });
-
-    formatter.print_suffix(stream);
-
-    return stream;
-}
-
-} // namespace output
-
 namespace input {
-
-// Will first be adding specific overloads of from_stream() for each container
-//   supported, which will result initially in much redundant code. Then will
-//   try to mimic Severeijns' metaprogramming generalizations to consolidate
-//   those overloads around the different container element insertion methods:
-//
-// pair:
-//   p.first = elem1;
-//   p.second = elem2;
-//     or
-//   std::make_pair(elem1, elem2);
-//
-// tuple:
-//   (not sure on this one yet - use recursive template like output::tuple_handler,
-//     with variadic function that returns std::make_tuple(args)?)
-//
-// array:
-//   a[i] = elem;
-//
-// forward_list:
-//   fl.emplace_after(fl.end(), elem);
-//
-// vector:
-// deque:
-// list:
-//   (in commmon: have emplace_back)
-//   v/d/l.emplace_back(elem);
-//
-// set:
-// multiset:
-// unordered_set:
-// unordered_multiset:
-//   (in common: have key_type, but no operator[])
-//   s/ms/us/ums.emplace(elem); (in non-multisets, redundant keys in serialization are ignored)
-//
-// map:
-// multimap:
-// unordered_map:
-// unordered_multimap:
-//   (in common: have key_type and operator[])
-//   parse pair, then
-//   m/mm/um/umm.emplace(elem1, elem2); (in non-multimaps, redundant keys in
-//       serialization will have first value)
-//     or
-//   m/mm/um/umm.emplace(std::make_pair(elem1, elem2)); (same behavior for emplace(elem1, elem2))
-//     or
-//   m/mm/um/umm.emplace(parsed pair); (same behavior for emplace(elem1, elem2))
-//     or
-//   m/mm/um/umm[pair.first] = pair.second; (in non-multimaps, redundant keys in
-//       serialization will have last value)
-//
-//   (maybe set failbit if redundant keys deserialized for non-multimaps?)
 
 template <typename CharacterType>
 static void extract_token(
-    std::basic_istream<CharacterType>& istream, const CharacterType *token) {
+    std::basic_istream<CharacterType>& istream, const CharacterType* token) {
     if (token == nullptr) {
         istream.setstate(std::ios_base::failbit);
         return;
@@ -611,48 +411,16 @@ static void extract_token(
     auto it_1 {token_s.begin()};
     while (!istream.eof() && it_1 != token_s.end() && istream.peek() == *it_1) {
         istream.get();
-        //std::cout << "\textract_token: get(): '" << static_cast<CharacterType>(istream.get()) <<  "'\n";
         ++it_1;
     }
     if (it_1 != token_s.end()) {
         // only partial delim match, return chars to stream
-        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2) {
-            // std::cout << "\textract_token: putback(): '" << *it_2 <<  "'\n";
+        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
             istream.putback(*it_2);
-        }
         istream.setstate(std::ios_base::failbit);
     }
     return;
 }
-
-
-template <typename Type, typename = void>
-struct has_emplace : public std::false_type
-{};
-
-template <typename Type>
-struct has_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
-    : public std::true_type
-{};
-
-template <typename Type, typename = void>
-struct has_emplace_back : public std::false_type
-{};
-
-template <typename Type>
-struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
-    : public std::true_type
-{};
-
-template <typename Type, typename = void>
-struct has_emplace_after : public std::false_type
-{};
-
-template <typename Type>
-struct has_emplace_after<Type, std::void_t<decltype(std::declval<Type&>().emplace_after())>>
-    : public std::true_type
-{};
-
 
 template <typename ContainerType, typename StreamType>
 struct default_formatter
@@ -731,38 +499,40 @@ struct default_formatter
     }
 
 #endif
-/*
+
     // std::forward_list
     template <typename ElementType>
     static auto insert_element(
         ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            input::has_emplace_after<ContainerType>::value &&
+            container_stream_io::traits::has_emplace_after<ContainerType>::value &&
             std::is_move_assignable<ElementType>::value, void>
     {
         container.emplace_after(container.end(), element);
     }
-*/
+
     // std::vector, std::deque, std::list
     template<typename ElementType>
     static auto insert_element(
         ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            input::has_emplace_back<ContainerType>::value &&
+            container_stream_io::traits::has_emplace_back<ContainerType>::value &&
             std::is_move_assignable<ElementType>::value, void>
     {
         container.emplace_back(element);
     }
-/*
-    // std::set, std::unordered_set, std::map, std::unordered_map (redundant keys will have first value)
-    // std::multiset, std::unordered_multiset, std::multimap, std::unordered_multimap
+
+    // std::(unordered_)set (redundant keys ignored)
+    // std::(unordered_)map (redundant keys will have first value)
+    // std::(unordered_)multiset, std::(unordered_)multimap
     template <typename ElementType>
     static auto insert_element(
         ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            input::has_emplace::value && !input::has_emplace_back::value &&
+            container_stream_io::traits::has_emplace<ContainerType>::value &&
+            !container_stream_io::traits::has_emplace_back<ContainerType>::value &&
             std::is_move_assignable<ElementType>::value, void>
     {
         container.emplace(element);
     }
-*/
+
     static void parse_delimiter(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.delimiter);
@@ -774,7 +544,7 @@ struct default_formatter
     }
 };
 
-// move-assignable (all (?) STL containers? (including std::array)
+// move-assignable (all STL containers (including std::array))
 template<typename ContainerType>
 static auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
         std::is_move_assignable<ContainerType>::value, void>
@@ -785,7 +555,7 @@ static auto safer_assign(ContainerType& source, ContainerType& target) -> std::e
 template<typename ElementType, std::size_t ArraySize>
 static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
 {
-    // optimize with C memcpy?
+    // TBD: optimize with C memcpy?
     // memcpy(&target[0], &source[0], ArraySize * sizeof ElementType);
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
@@ -808,7 +578,7 @@ static StreamType& array_from_stream(
     if (!istream.good())
         return istream;
 
-    if (output::is_empty(container)) {
+    if (container_stream_io::traits::is_empty(container)) {
         formatter.parse_suffix(istream);
         return istream;
     }
@@ -953,6 +723,185 @@ static StreamType& from_stream(
 }
 
 } // namespace input
+
+namespace output {
+
+/**
+ * @brief Default container formatter that will be used to print prefix,
+ * element, separator, and suffix strings to an output stream.
+ */
+template <typename ContainerType, typename StreamType>
+struct default_formatter
+{
+    static constexpr auto decorators = container_stream_io::decorator::delimiters<
+        ContainerType, typename StreamType::char_type>::values;
+
+    static void print_prefix(StreamType& stream) noexcept
+    {
+        stream << decorators.prefix;
+    }
+
+    template <typename ElementType>
+    static void print_element(StreamType& stream, const ElementType& element) noexcept
+    {
+        stream << element;
+    }
+
+    template <std::size_t ArraySize>
+    static void print_element(StreamType& stream, const char (&element)[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template <std::size_t ArraySize>
+    static void print_element(StreamType& stream, const wchar_t (&element)[ArraySize]) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+    template<typename CharacterType>
+    static void print_element(StreamType& stream,
+                              const std::basic_string<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#if (__cplusplus >= 201703L)
+    template<typename CharacterType>
+    static void print_element(StreamType& stream,
+                              const std::basic_string_view<CharacterType>& element) noexcept
+    {
+        stream << std::quoted(element);
+    }
+
+#endif
+    static void print_delimiter(StreamType& stream) noexcept
+    {
+        stream << decorators.delimiter << decorators.whitespace;
+    }
+
+    static void print_suffix(StreamType& stream) noexcept
+    {
+        stream << decorators.suffix;
+    }
+};
+
+/**
+ * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
+ */
+template <typename TupleType, std::size_t Index, std::size_t Last>
+struct tuple_handler
+{
+    template <typename StreamType, typename FormatterType>
+    static void
+    print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
+    {
+        stream << std::get<Index>(container);
+        formatter.print_delimiter(stream);
+        tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
+    }
+};
+
+/**
+ * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
+ */
+template <typename TupleType>
+struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
+{
+    template <typename StreamType, typename FormatterType>
+    static void print(
+        StreamType& /*stream*/, const TupleType& /*tuple*/,
+        const FormatterType& /*formatter*/) noexcept
+    {}
+};
+
+/**
+ * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
+ * object.
+ */
+template <typename TupleType, std::size_t Index>
+struct tuple_handler<TupleType, Index, Index>
+{
+    template <typename StreamType, typename FormatterType>
+    static void
+    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
+    {
+        formatter.print_element(stream, std::get<Index>(tuple));
+    }
+};
+
+/**
+ * @brief Overload to deal with std::tuple<...> objects.
+ */
+template <typename StreamType, typename FormatterType, typename... TupleArgs>
+static StreamType& to_stream(
+    StreamType& stream, const std::tuple<TupleArgs...>& container,
+    const FormatterType& formatter)
+{
+    using ContainerType = std::decay_t<decltype(container)>;
+
+    formatter.print_prefix(stream);
+    tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
+    formatter.print_suffix(stream);
+
+    return stream;
+}
+
+/**
+ * @brief Overload to handle std::pair<...> objects.
+ */
+template <typename FirstType, typename SecondType, typename StreamType, typename FormatterType>
+static StreamType& to_stream(
+    StreamType& stream, const std::pair<FirstType, SecondType>& container,
+    const FormatterType& formatter)
+{
+    formatter.print_prefix(stream);
+    formatter.print_element(stream, container.first);
+    formatter.print_delimiter(stream);
+    formatter.print_element(stream, container.second);
+    formatter.print_suffix(stream);
+
+    return stream;
+}
+
+/**
+ * @brief Overload to handle containers that support the notion of "emptiness,"
+ * and forward-iterability.
+ */
+template <typename ContainerType, typename StreamType, typename FormatterType>
+static StreamType& to_stream(
+    StreamType& stream, const ContainerType& container,
+    const FormatterType& formatter)
+{
+    formatter.print_prefix(stream);
+
+    if (container_stream_io::traits::is_empty(container)) {
+        formatter.print_suffix(stream);
+
+        return stream;
+    }
+
+    auto begin = std::begin(container);
+    formatter.print_element(stream, *begin);
+
+    std::advance(begin, 1);
+
+    std::for_each(begin, std::end(container),
+#ifdef __cpp_generic_lambdas
+                  [&stream, &formatter](const auto& element) {
+#else
+                  [&stream, &formatter](const decltype(*begin)& element) {
+#endif
+        formatter.print_delimiter(stream);
+        formatter.print_element(stream, element);
+    });
+
+    formatter.print_suffix(stream);
+
+    return stream;
+}
+
+} // namespace output
 
 } // namespace container_stream_io
 
