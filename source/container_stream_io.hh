@@ -680,6 +680,29 @@ struct default_formatter
         istream >> std::ws >> element;
     }
 
+    template <typename CharType>
+    static void parse_char(StreamType& istream, CharType& element) noexcept
+    {
+        std::basic_string<CharType> s;
+        istream >> std::ws >> std::quoted(s, CharType('\''));
+        if (s.size() != 1)
+        {
+            istream.setstate(std::ios_base::failbit);
+            return;
+        }
+        element = s[0];
+    }
+
+    static void parse_element(StreamType& istream, char& element) noexcept
+    {
+        parse_char<char>(istream, element);
+    }
+
+    static void parse_element(StreamType& istream, wchar_t& element) noexcept
+    {
+        parse_char<wchar_t>(istream, element);
+    }
+
     template <typename CharType, std::size_t ArraySize>
     static void parse_char_array(StreamType& istream, CharType (&element)[ArraySize]) noexcept
     {
@@ -918,6 +941,7 @@ static StreamType& from_stream(
     StreamType& istream, ContainerType& container,
     const FormatterType& formatter)
 {
+    std::cout << "generic from_stream\n";
     formatter.parse_prefix(istream);
     if (!istream.good())
         return istream;
@@ -989,6 +1013,18 @@ struct default_formatter
     static void print_element(StreamType& stream, const ElementType& element) noexcept
     {
         stream << element;
+    }
+
+    static void print_element(StreamType& stream, const char& element) noexcept
+    {
+        char arr[2] {element, '\0'};
+        stream << std::quoted(arr, '\'');
+    }
+
+    static void print_element(StreamType& stream, const wchar_t& element) noexcept
+    {
+        wchar_t arr[2] {element, L'\0'};
+        stream << std::quoted(arr, L'\'');
     }
 
     template <std::size_t ArraySize>
