@@ -27,17 +27,9 @@
 
 namespace std {
 
-#if (__cplusplus < 201703L)
-
-#  ifndef __cpp_lib_void_t
-
-#define __cpp_lib_void_t 201411L
-template<typename...>
-using void_t = void;
-
-#  endif
-
-#endif
+#if (__cplusplus < 201103L)
+#error "container_stream_io only supports C++11 and above"
+#endif  // pre-C++11
 
 #if (__cplusplus < 201402L)
 
@@ -55,9 +47,189 @@ using enable_if_t = typename enable_if<B,T>::type;
 // Use of generic lambda in to_stream(not tuple or pair) below ellided by
 //   testing for feature test macro __cpp_generic_lambdas.
 
-// TBD: need to add version of std::quoted for C++11 compatibility
+#  ifndef __cpp_lib_quoted_string_io
 
-#endif
+#define __cpp_lib_quoted_string_io 201304L
+
+namespace __detail {
+
+// Adapted from bits/quoted_string.h; only using reserved namespace __detail
+//   so that when adding char overload for std::quoted, it can get _Quoted_string
+//   from here with C++11, or from STL if C++14 and up.
+
+// TBD: If using a custom version, and including a copy of all of std::quoted
+//   for C++11 anyway, perhaps later we can adapt it even further by setting
+//   string types to is_(parse/print)able_as_container == true, and then:
+//     - replace _Quoted_string with alternate version of decorators::wrapper
+//     - replace operator>>/<< with new overloads of to_/from_stream
+
+// Also TBD: if committing to custom version of quoted(), then adding some
+//   way to (de)serialize unprintable chars: probably normal ASCII escapes,
+//   \0, and Pythonic \x(2-digit hex) for the rest
+
+/**
+ * @brief Struct for delimited strings.
+ */
+template<typename StringType, typename CharType>
+struct _Quoted_string
+{
+    static_assert(std::is_reference<StringType>::value ||
+                  std::is_pointer<StringType>::value,
+                  "String type must be pointer or reference");
+
+    StringType string;
+    CharType delim;
+    CharType escape;
+
+    _Quoted_string(StringType str, CharType dlm, CharType esc)
+	: string(str), delim{dlm}, escape{esc}
+    {}
+
+    _Quoted_string& operator=(_Quoted_string&) = delete;
+};
+
+/**
+ * @brief Inserter for quoted strings.
+ */
+template<typename CharType, typename TraitsType>
+std::basic_ostream<CharType, TraitsType>& operator<<(
+    std::basic_ostream<CharType, TraitsType>& os,
+    const _Quoted_string<const CharType*, CharType>& str)
+{
+    std::basic_ostringstream<CharType, TraitsType> oss;
+    oss << str.delim;
+    for (const CharType* c = str.string; *c; ++c)
+    {
+        if (*c == str.delim || *c == str.escape)
+            oss << str.escape;
+        oss << *c;
+    }
+    oss << str.delim;
+
+    return os << oss.str();
+}
+
+/**
+ * @brief Inserter for quoted strings.
+ */
+template<typename CharType, typename TraitsType, typename StringType>
+std::basic_ostream<CharType, TraitsType>& operator<<(
+    std::basic_ostream<CharType, TraitsType>& os,
+    const _Quoted_string<StringType, CharType>& str)
+{
+    std::basic_ostringstream<CharType, TraitsType> oss;
+    oss << str.delim;
+    for (auto c : str.string)
+    {
+        if (c == str.delim || c == str.escape)
+            oss << str.escape;
+        oss << c;
+    }
+    oss << str.delim;
+
+    return os << oss.str();
+}
+
+/**
+ * @brief Extractor for delimited strings.
+ *
+ * Differs from iomanip + bits/quoted_string.h version in that failure to extract
+ * leading and trailing delimiters counts as extraction failure.
+ */
+template<typename CharType, typename TraitsType, typename AllocatorType>
+std::basic_istream<CharType, TraitsType>& operator>>(
+    std::basic_istream<CharType, TraitsType>& is,
+    const _Quoted_string<basic_string<CharType, TraitsType, AllocatorType>&, CharType>& str)
+{
+    CharType c;
+    is >> c;
+    if (!is.good())
+        return is;
+    if (c != str.delim)
+    {
+        is.setstate(std::ios_base::failbit);
+        return is;
+    }
+    str.string.clear();
+    std::ios_base::fmtflags flags
+        = is.flags(is.flags() & ~std::ios_base::skipws);
+    do
+    {
+        is >> c;
+        if (!is.good())
+            break;
+        if (c == str.escape)
+        {
+            is >> c;
+            if (!is.good())
+                break;
+        }
+        else if (c == str.delim)
+            break;
+        str.string += c;
+    } while (true);
+
+    if (c != str.delim)
+        is.setstate(std::ios_base::failbit);
+    is.setf(flags);
+    return is;
+}
+
+}  // namespace __detail
+
+/**
+ * @brief Manipulator for quoted strings.
+ * @param string String to quote.
+ * @param delim  Character to quote string with.
+ * @param escape Escape character to escape itself or quote character.
+ */
+template<typename CharType>
+inline auto quoted(
+    const CharType* string, CharType delim = CharType('"'),
+    CharType escape = CharType('\\')) ->
+    __detail::_Quoted_string<const CharType*, CharType>
+{
+    return __detail::_Quoted_string<const CharType*, CharType>(
+        string, delim, escape);
+}
+
+template<typename CharType, typename TraitsType, typename AllocatorType>
+inline auto quoted(
+    const basic_string<CharType, TraitsType, AllocatorType>& string,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')) ->
+    __detail::_Quoted_string<
+	const basic_string<CharType, TraitsType, AllocatorType>&, CharType>
+{
+    return __detail::_Quoted_string<
+	const basic_string<CharType, TraitsType, AllocatorType>&, CharType>(
+	    string, delim, escape);
+}
+
+template<typename CharType, typename TraitsType, typename AllocatorType>
+inline auto quoted(
+    basic_string<CharType, TraitsType, AllocatorType>& string,
+       CharType delim = CharType('"'), CharType escape = CharType('\\')) ->
+    __detail::_Quoted_string<
+        basic_string<CharType, TraitsType, AllocatorType>&, CharType>
+{
+    return __detail::_Quoted_string<
+        basic_string<CharType, TraitsType, AllocatorType>&, CharType>(
+            string, delim, escape);
+}
+
+#  endif  // undefined __cpp_lib_quoted_string_io
+
+#endif  // pre-C++14
+
+#if (__cplusplus < 201703L)
+
+#  ifndef __cpp_lib_void_t
+#define __cpp_lib_void_t 201411L
+template<typename...>
+using void_t = void;
+#  endif  // undefined __cpp_lib_void_t
+
+#endif  // pre-C++17
 
 }  // namespace std
 
@@ -508,42 +680,30 @@ struct default_formatter
         istream >> std::ws >> element;
     }
 
-    template <std::size_t ArraySize>
-    static void parse_element(StreamType& istream, char (&element)[ArraySize]) noexcept
+    template <typename CharType, std::size_t ArraySize>
+    static void parse_char_array(StreamType& istream, CharType (&element)[ArraySize]) noexcept
     {
-        // can only use quoted with operator>> when target is string, not C-array
-        std::string s;
+        std::basic_string<CharType> s;
         istream >> std::ws >> std::quoted(s);
-        if (s.size() > ArraySize - 1) {
+        if (s.size() > ArraySize - 1)
+        {
             istream.setstate(std::ios_base::failbit);
             return;
         }
-        auto arr_it {std::begin(element)};
-        for (const auto &c : s) {
-            *arr_it = c;
-            ++arr_it;
-        }
-        for (auto arr_end {std::end(element)}; arr_it != arr_end; ++arr_it)
-            *arr_it = '\0';
+        auto it {std::copy(s.begin(), s.end(), std::begin(element))};
+        std::fill(it, std::end(element), CharType('\0'));
+    }
+
+    template <std::size_t ArraySize>
+    static void parse_element(StreamType& istream, char (&element)[ArraySize]) noexcept
+    {
+        parse_char_array<char, ArraySize>(istream, element);
     }
 
     template <std::size_t ArraySize>
     static void parse_element(StreamType& istream, wchar_t (&element)[ArraySize]) noexcept
     {
-        // can only use quoted with operator>> when target is string, not C-array
-        std::wstring s;
-        istream >> std::ws >> std::quoted(s);
-        if (s.size() > ArraySize - 1) {
-            istream.setstate(std::ios_base::failbit);
-            return;
-        }
-        auto arr_it {std::begin(element)};
-        for (const auto &c : s) {
-            *arr_it = c;
-            ++arr_it;
-        }
-        for (auto arr_end {std::end(element)}; arr_it != arr_end; ++arr_it)
-            *arr_it = L'\0';
+        parse_char_array<char, ArraySize>(istream, element);
     }
 
     template<typename CharacterType>
@@ -587,7 +747,7 @@ struct default_formatter
     }
 
     // std::(unordered_)set (redundant keys ignored)
-    // std::(unordered_)map (redundant keys will have first value)
+    // std::(unordered_)map (redundant keys will have value of first appearance in serialization)
     // std::(unordered_)multiset, std::(unordered_)multimap
     template <typename ElementType>
     static auto insert_element(
