@@ -393,13 +393,6 @@ struct delimiters<std::tuple<DataType...>, wchar_t>
 namespace strings {
 
 namespace detail {
-// Adapted from bits/quoted_string.h; only using reserved namespace __detail
-//   so that when adding char overload for std::quoted, it can get _Quoted_string
-//   from here with C++11, or from STL if C++14 and up.
-
-// Also TBD: if committing to custom version of quoted(), then adding some
-//   way to (de)serialize unprintable chars: probably normal ASCII escapes,
-//   \0, and Pythonic \x(2-digit hex) for the rest
 
 template<typename CharType>
 struct escape_seq
@@ -407,6 +400,49 @@ struct escape_seq
     CharType actual;
     CharType symbol;
 };
+
+// creating this wrapper allows for different size sets of escapes per char type
+template<typename EscSeqArrayType>
+struct std_escape
+{
+    EscSeqArrayType seqs;
+};
+
+template<>
+struct std_escape<char>
+{
+    static constexpr std::array<escape_seq<char>, 8> seqs
+    {
+        {
+            {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
+            {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
+        }
+    };
+};
+
+// linker needs declaration of static constexpr members outside class for
+//   standards below C++17, see:
+//   - https://en.cppreference.com/w/cpp/language/static
+//   - https://stackoverflow.com/a/28846608
+#if (__cplusplus < 201703L)
+constexpr std::array<escape_seq<char>, 8> std_escape<char>::seqs;
+#endif  // pre-C++17
+
+template<>
+struct std_escape<wchar_t>
+{
+    static constexpr std::array<escape_seq<wchar_t>, 8> seqs
+    {
+        {
+            {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
+            {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
+        }
+    };
+};
+
+#if (__cplusplus < 201703L)
+constexpr std::array<escape_seq<wchar_t>, 8> std_escape<wchar_t>::seqs;
+#endif  // pre-C++17
 
 /**
  * @brief Struct for string literal representations.
@@ -425,11 +461,8 @@ struct string_literal
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
     // currently ignoring '\?' and trigraphs
-    static constexpr escape_seq<CharType> escape_seqs[]
-    {
-        {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
-        {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
-    };
+    static constexpr decltype(std_escape<CharType>::seqs) escape_seqs {
+        std_escape<CharType>::seqs};
 
     string_literal(void) = delete;
     string_literal(StringType str, CharType dlm, CharType esc)
@@ -444,15 +477,11 @@ struct string_literal
     string_literal& operator=(string_literal&) = delete;
 };
 
-
 #if (__cplusplus < 201703L)
-// linker needs declaration outside class for standards below C++17, see:
-//  - https://stackoverflow.com/questions/8016780
-template<typename CharType,
-         template<typename StringType, typename> class StringLiteralType>
-constexpr escape_seq<CharType> StringLiteralType<StringType, CharType>::escape_seqs;
+template<typename StringType, typename CharType>
+constexpr decltype(std_escape<CharType>::seqs) string_literal<
+    StringType, CharType>::escape_seqs;
 #endif  // pre-C++17
-
 
 /**
  * @brief Inserter for quoted strings.
