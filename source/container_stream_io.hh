@@ -730,15 +730,16 @@ static void extract_token(
     }
     auto token_s {
 #if (__cplusplus >= 201703L)
-        std::string_view{token}
+        std::basic_string_view<CharacterType>{token}
 #else
-        std::string{token}
+        std::basic_string<CharacterType>{token}
 #endif
     };
     // no check for size of 0 needed, as then begin() == end()
     istream >> std::ws;
     auto it_1 {token_s.begin()};
-    while (!istream.eof() && it_1 != token_s.end() && istream.peek() == *it_1) {
+    while (!istream.eof() && it_1 != token_s.end() &&
+           CharacterType(istream.peek()) == *it_1) {
         istream.get();
         ++it_1;
     }
