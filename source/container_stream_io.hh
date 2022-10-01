@@ -483,6 +483,15 @@ constexpr decltype(std_escape<CharType>::seqs) string_literal<
     StringType, CharType>::escape_seqs;
 #endif  // pre-C++17
 
+// stream index getter for use with iword/pword to set literalrepr/quotedrepr
+static inline int get_manip_i() {
+    static int i {std::ios_base::xalloc()};
+    return i;
+}
+
+// labels for flag values used to set string representation type
+enum repr { literal, quoted };
+
 /**
  * @brief Inserter for quoted strings.
  */
@@ -507,7 +516,7 @@ std::basic_ostream<CharType, TraitsType>& operator<<(
                 oss << str.escape;
             oss << c;
         }
-        else
+        else if (os.iword(get_manip_i()) == repr::literal)
         {
             oss << str.escape;
             auto esc_it {std::find_if(
@@ -546,23 +555,17 @@ std::basic_istream<CharType, TraitsType>& operator>>(
     if (std::is_same<CharType, wchar_t>::value)
     {
         is >> c;
+        if (c != L'L')
+            is.setstate(std::ios_base::failbit);
         if (!is.good())
             return is;
-        if (c != L'L')
-        {
-            is.setstate(std::ios_base::failbit);
-            return is;
-        }
     }
     is >> c;
+    if (c != str.delim)
+        is.setstate(std::ios_base::failbit);
     if (!is.good())
         return is;
-    if (c != str.delim)
-    {
-        is.setstate(std::ios_base::failbit);
-        return is;
-    }
-    str.string.clear();
+    std::decay_t<decltype(str.string)> temp;
     std::ios_base::fmtflags flags
         = is.flags(is.flags() & ~std::ios_base::skipws);
     do
@@ -572,7 +575,7 @@ std::basic_istream<CharType, TraitsType>& operator>>(
             break;
         if (c != str.escape)
         {
-            str.string += c;
+            temp += c;
             continue;
         }
         is >> c;
@@ -580,35 +583,58 @@ std::basic_istream<CharType, TraitsType>& operator>>(
             break;
         if (c == str.escape || c == str.delim)
         {
-            str.string += c;
-            continue;
+            temp += c;
         }
-        auto esc_it {std::find_if(
-                std::begin(str.escape_seqs), std::end(str.escape_seqs),
-                [&c](const escape_seq<CharType>& seq){ return seq.symbol == c; })};
-        if (esc_it != std::end(str.escape_seqs))  // standard escape sequence
+        else if (is.iword(get_manip_i()) == repr::literal)
         {
-            str.string += esc_it->actual;
+            auto esc_it {std::find_if(
+                    std::begin(str.escape_seqs), std::end(str.escape_seqs),
+                    [&c](const escape_seq<CharType>& seq){ return seq.symbol == c; })};
+            if (esc_it != std::end(str.escape_seqs))  // standard escape sequence
+            {
+                temp += esc_it->actual;
+            }
+            else if (c == CharType('x')) // custom hex escape sequence
+            {
+                int hex_val;
+                is >> std::hex >> std::setw(2) >> hex_val;
+                temp += CharType(hex_val);
+            }
+            else  // invalid escape
+            {
+                is.setstate(std::ios_base::failbit);
+            }
         }
-        else if (c == CharType('x')) // custom hex escape sequence
-        {
-            int hex_val;
-            is >> std::hex >> std::setw(2) >> hex_val;
-            str.string += CharType(hex_val);
-        }
-        else
+        else  // invalid escape
         {
             is.setstate(std::ios_base::failbit);
-            break;
         }
-    } while (true);
+    } while (is.good());
     if (c != str.delim)
         is.setstate(std::ios_base::failbit);
     is.setf(flags);
+    if (!is.fail() && !is.bad())
+        str.string = std::move(temp);
     return is;
 }
 
 }  // namespace detail
+
+// default is string literals, with most ASCII escapes plus hex escapes
+template<typename CharacterType, typename TraitsType>
+std::basic_ios<CharacterType, TraitsType>& literalrepr(
+    std::basic_ios<CharacterType, TraitsType>& stream) {
+    stream.iword(detail::get_manip_i()) = detail::repr::literal;
+    return stream;
+}
+
+// only escape char and delimiter escaped
+template<typename CharacterType, typename TraitsType>
+std::basic_ios<CharacterType, TraitsType>& quotedrepr(
+    std::basic_ios<CharacterType, TraitsType>& stream) {
+    stream.iword(detail::get_manip_i()) = detail::repr::quoted;
+    return stream;
+}
 
 /**
  * @brief Manipulator for quoted strings.
