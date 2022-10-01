@@ -401,21 +401,20 @@ struct escape_seq
     CharType symbol;
 };
 
-// creating this wrapper allows for different size sets of escapes per char type
-template<typename EscSeqArrayType>
-struct std_escape
+// char and wchar_t share the same set of standard escape sequences
+// currently no plans to support unicode
+// wrapping in struct to avoid variable template use for C++11 compliance
+template<typename CharType>
+struct ascii_escape
 {
-    EscSeqArrayType seqs;
-};
-
-template<>
-struct std_escape<char>
-{
-    static constexpr std::array<escape_seq<char>, 8> seqs
+    static constexpr std::array<escape_seq<CharType>, 8> seqs
     {
         {
             {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
             {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
+            // \', \", and \\ handled by choosing custom delim/escape chars per task
+            // \? and trigraphs ignored for now, see:
+            //   - https://en.cppreference.com/w/c/language/operator_alternative
         }
     };
 };
@@ -425,23 +424,8 @@ struct std_escape<char>
 //   - https://en.cppreference.com/w/cpp/language/static
 //   - https://stackoverflow.com/a/28846608
 #if (__cplusplus < 201703L)
-constexpr std::array<escape_seq<char>, 8> std_escape<char>::seqs;
-#endif  // pre-C++17
-
-template<>
-struct std_escape<wchar_t>
-{
-    static constexpr std::array<escape_seq<wchar_t>, 8> seqs
-    {
-        {
-            {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
-            {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
-        }
-    };
-};
-
-#if (__cplusplus < 201703L)
-constexpr std::array<escape_seq<wchar_t>, 8> std_escape<wchar_t>::seqs;
+template<typename CharType>
+constexpr std::array<escape_seq<CharType>, 8> ascii_escape<CharType>::seqs;
 #endif  // pre-C++17
 
 /**
@@ -460,9 +444,8 @@ struct string_literal
 
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
-    // currently ignoring '\?' and trigraphs
-    static constexpr decltype(std_escape<CharType>::seqs) escape_seqs {
-        std_escape<CharType>::seqs};
+    static constexpr decltype(ascii_escape<CharType>::seqs) escape_seqs {
+        ascii_escape<CharType>::seqs};
 
     string_literal(void) = delete;
     string_literal(StringType str, CharType dlm, CharType esc)
@@ -479,7 +462,7 @@ struct string_literal
 
 #if (__cplusplus < 201703L)
 template<typename StringType, typename CharType>
-constexpr decltype(std_escape<CharType>::seqs) string_literal<
+constexpr decltype(ascii_escape<CharType>::seqs) string_literal<
     StringType, CharType>::escape_seqs;
 #endif  // pre-C++17
 
