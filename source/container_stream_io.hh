@@ -1,35 +1,22 @@
 #pragma once
 
-#include <algorithm>  // copy
-#include <cstddef>
+#include <algorithm>  // copy find_if for_each (limits:numeric_limits)
+// #include <cstddef>    // size_t
 #include <iostream>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
 
-// Temporary includes for from_stream overloads
-//#include <array>
-//#include <vector>
-//#include <deque>
-//#include <forward_list>
-//#include <list>
-//#include <map>
-//#include <unordered_set>
-//#include <unordered_map>
-//#include <stack>
-//#include <queue>
-
-#include <iomanip>  // quoted
-#include <iterator>  // begin, end
-
-// #include "TypeName.hh"
-
-namespace std {
+#include <iomanip>   // setfill, setw
+// #include <iterator>  // begin, end
+// #include <type_traits>  // true_type, false_type
 
 #if (__cplusplus < 201103L)
 #error "container_stream_io only supports C++11 and above"
 #endif  // pre-C++11
+
+namespace std {
 
 #if (__cplusplus < 201402L)
 
@@ -41,7 +28,7 @@ using decay_t = typename decay<T>::type;
 template< bool B, class T = void >
 using enable_if_t = typename enable_if<B,T>::type;
 
-// Use of variable template is_printable_as_container_v below ellided by
+// Use of variable template is_(parse/print)able_as_container_v below ellided by
 //   testing for feature test macro __cpp_variable_templates.
 
 // Use of generic lambda in to_stream(not tuple or pair) below ellided by
@@ -136,14 +123,14 @@ struct is_parseable_as_container<
     std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
 {};
 
+#ifdef __cpp_variable_templates
 /**
  * @brief Helper variable template.
  */
-#ifdef __cpp_variable_templates
 template <typename Type>
 constexpr bool is_parseable_as_container_v = is_parseable_as_container<Type>::value;
-#endif
 
+#endif
 /**
  * @brief Base case for the testing of STL compatible container types.
  */
@@ -209,14 +196,14 @@ struct is_printable_as_container<
     std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
 {};
 
+#ifdef __cpp_variable_templates
 /**
  * @brief Helper variable template.
  */
-#ifdef __cpp_variable_templates
 template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
-#endif
 
+#endif
 /**
  * @brief Helper function to determine if a container is empty.
  */
@@ -271,14 +258,12 @@ namespace decorator {
  * print out the containers.
  */
 template <typename CharacterType>
-struct wrapper
+struct delim_wrapper
 {
-    using type = CharacterType;
-
-    const type* prefix;
-    const type* delimiter;
-    const type* whitespace;
-    const type* suffix;
+    const CharacterType* prefix;
+    const CharacterType* separator;
+    const CharacterType* whitespace;
+    const CharacterType* suffix;
 };
 
 /**
@@ -287,9 +272,7 @@ struct wrapper
 template <typename /*ContainerType*/, typename CharacterType>
 struct delimiters
 {
-    using type = wrapper<CharacterType>;
-
-    static const type values;
+    static const delim_wrapper<CharacterType> values;
 };
 
 /**
@@ -299,9 +282,7 @@ struct delimiters
 template <typename ContainerType>
 struct delimiters<ContainerType, char>
 {
-    using type = wrapper<char>;
-
-    static constexpr type values = { "[", ",", " ", "]" };
+    static constexpr delim_wrapper<char> values { "[", ",", " ", "]" };
 };
 
 /**
@@ -311,9 +292,7 @@ struct delimiters<ContainerType, char>
 template <typename ContainerType>
 struct delimiters<ContainerType, wchar_t>
 {
-    using type = wrapper<wchar_t>;
-
-    static constexpr type values = { L"[", L",", L" ", L"]" };
+    static constexpr delim_wrapper<wchar_t> values { L"[", L",", L" ", L"]" };
 };
 
 /**
@@ -322,7 +301,7 @@ struct delimiters<ContainerType, wchar_t>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
 {
-    static constexpr wrapper<char> values = { "{", ",", " ", "}" };
+    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
 };
 
 /**
@@ -331,7 +310,7 @@ struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"{", L",", L" ", L"}" };
+    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
 };
 
 /**
@@ -340,7 +319,7 @@ struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
 {
-    static constexpr wrapper<char> values = { "{", ",", " ", "}" };
+    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
 };
 
 /**
@@ -349,7 +328,7 @@ struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
 template <typename DataType, typename ComparatorType, typename AllocatorType>
 struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"{", L",", L" ", L"}" };
+    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
 };
 
 /**
@@ -358,7 +337,7 @@ struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_
 template <typename FirstType, typename SecondType>
 struct delimiters<std::pair<FirstType, SecondType>, char>
 {
-    static constexpr wrapper<char> values = { "(", ",", " ", ")" };
+    static constexpr delim_wrapper<char> values { "(", ",", " ", ")" };
 };
 
 /**
@@ -367,7 +346,7 @@ struct delimiters<std::pair<FirstType, SecondType>, char>
 template <typename FirstType, typename SecondType>
 struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"(", L",", L" ", L")" };
+    static constexpr delim_wrapper<wchar_t> values { L"(", L",", L" ", L")" };
 };
 
 /**
@@ -376,7 +355,7 @@ struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
 template <typename... DataType>
 struct delimiters<std::tuple<DataType...>, char>
 {
-    static constexpr wrapper<char> values = { "<", ",", " ", ">" };
+    static constexpr delim_wrapper<char> values { "<", ",", " ", ">" };
 };
 
 /**
@@ -385,7 +364,7 @@ struct delimiters<std::tuple<DataType...>, char>
 template <typename... DataType>
 struct delimiters<std::tuple<DataType...>, wchar_t>
 {
-    static constexpr wrapper<wchar_t> values = { L"<", L",", L" ", L">" };
+    static constexpr delim_wrapper<wchar_t> values { L"<", L",", L" ", L">" };
 };
 
 } // namespace decorator
@@ -394,20 +373,20 @@ namespace strings {
 
 namespace detail {
 
-template<typename CharType>
+template<typename CharacterType>
 struct escape_seq
 {
-    CharType actual;
-    CharType symbol;
+    CharacterType actual;
+    CharacterType symbol;
 };
 
 // char and wchar_t share the same set of standard escape sequences
 // currently no plans to support unicode
 // wrapping in struct to avoid variable template use for C++11 compliance
-template<typename CharType>
+template<typename CharacterType>
 struct ascii_escape
 {
-    static constexpr std::array<escape_seq<CharType>, 8> seqs
+    static constexpr std::array<escape_seq<CharacterType>, 8> seqs
     {
         {
             {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
@@ -419,36 +398,27 @@ struct ascii_escape
     };
 };
 
-// linker needs declaration of static constexpr members outside class for
-//   standards below C++17, see:
-//   - https://en.cppreference.com/w/cpp/language/static
-//   - https://stackoverflow.com/a/28846608
-#if (__cplusplus < 201703L)
-template<typename CharType>
-constexpr std::array<escape_seq<CharType>, 8> ascii_escape<CharType>::seqs;
-#endif  // pre-C++17
-
 /**
  * @brief Struct for string literal representations.
  */
-template<typename StringType, typename CharType>
-struct string_literal
+template<typename StringType, typename CharacterType>
+struct string_repr
 {
     static_assert(std::is_pointer<StringType>::value ||
                   std::is_reference<StringType>::value,
                   "String type must be a pointer or reference");
 
     StringType string;
-    CharType delim;
-    CharType escape;
+    CharacterType delim;
+    CharacterType escape;
 
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
-    static constexpr decltype(ascii_escape<CharType>::seqs) escape_seqs {
-        ascii_escape<CharType>::seqs};
+    static constexpr decltype(ascii_escape<CharacterType>::seqs) escape_seqs {
+        ascii_escape<CharacterType>::seqs};
 
-    string_literal(void) = delete;
-    string_literal(StringType str, CharType dlm, CharType esc)
+    string_repr(void) = delete;
+    string_repr(StringType str, CharacterType dlm, CharacterType esc)
 	: string(str), delim{dlm}, escape{esc}
     {
         // relies on implicit conversion of char to wchar_t in iswprint()
@@ -457,17 +427,22 @@ struct string_literal
                       "delim and escape must be printable characters"));
     }
 
-    string_literal& operator=(string_literal&) = delete;
+    string_repr& operator=(string_repr&) = delete;
 };
 
+// linker needs declaration of static constexpr members outside class for
+//   standards below C++17, see:
+//   - https://en.cppreference.com/w/cpp/language/static
+//   - https://stackoverflow.com/a/28846608
 #if (__cplusplus < 201703L)
-template<typename StringType, typename CharType>
-constexpr decltype(ascii_escape<CharType>::seqs) string_literal<
-    StringType, CharType>::escape_seqs;
+template<typename StringType, typename CharacterType>
+constexpr decltype(ascii_escape<CharacterType>::seqs) string_repr<
+    StringType, CharacterType>::escape_seqs;
 #endif  // pre-C++17
 
 // stream index getter for use with iword/pword to set literalrepr/quotedrepr
-static inline int get_manip_i() {
+static inline int get_manip_i()
+{
     static int i {std::ios_base::xalloc()};
     return i;
 }
@@ -478,20 +453,20 @@ enum repr { literal, quoted };
 /**
  * @brief Inserter for quoted strings.
  */
-template<typename CharType, typename TraitsType, typename AllocatorType>
-std::basic_ostream<CharType, TraitsType>& operator<<(
-    std::basic_ostream<CharType, TraitsType>& os,
-    const string_literal<
-    const std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>& str)
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
+std::basic_ostream<CharacterType, TraitsType>& operator<<(
+    std::basic_ostream<CharacterType, TraitsType>& os,
+    const string_repr<
+    const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
 {
-    std::basic_ostringstream<CharType, TraitsType> oss;
+    std::basic_ostringstream<CharacterType, TraitsType> oss;
     // currently only supporting 2 char types, of those only wchar_t takes a prefix
-    if (std::is_same<CharType, wchar_t>::value)
-        oss << CharType('L');
+    if (std::is_same<CharacterType, wchar_t>::value)
+        oss << CharacterType('L');
     oss << str.delim;
     for (const auto &c : str.string)
     {
-        // string_literal ctor enforces printable delim and escape
+        // string_repr ctor enforces printable delim and escape
         // relies on implicit conversion of char to wchar_t in iswprint()
         if (std::iswprint(c))
         {
@@ -504,7 +479,7 @@ std::basic_ostream<CharType, TraitsType>& operator<<(
             oss << str.escape;
             auto esc_it {std::find_if(
                     std::begin(str.escape_seqs), std::end(str.escape_seqs),
-                    [&c](const escape_seq<CharType>& seq){
+                    [&c](const escape_seq<CharacterType>& seq){
                         return seq.actual == c; })};
             if (esc_it != std::end(str.escape_seqs))  // standard escape sequence
             {
@@ -512,8 +487,8 @@ std::basic_ostream<CharType, TraitsType>& operator<<(
             }
             else  // custom hex escape sequence
             {
-                oss << CharType('x') <<
-                    std::hex << std::setfill(CharType('0')) << std::setw(2) <<
+                oss << CharacterType('x') <<
+                    std::hex << std::setfill(CharacterType('0')) << std::setw(2) <<
                     (0xff & (unsigned int)c);
             }
         }
@@ -529,13 +504,13 @@ std::basic_ostream<CharType, TraitsType>& operator<<(
  * Differs from iomanip + bits/quoted_string.h version in that failure to extract
  * leading and trailing delimiters counts as extraction failure.
  */
-template<typename CharType, typename TraitsType, typename AllocatorType>
-std::basic_istream<CharType, TraitsType>& operator>>(
-    std::basic_istream<CharType, TraitsType>& is,
-    const string_literal<std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>& str)
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
+std::basic_istream<CharacterType, TraitsType>& operator>>(
+    std::basic_istream<CharacterType, TraitsType>& is,
+    const string_repr<std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
 {
-    CharType c;
-    if (std::is_same<CharType, wchar_t>::value)
+    CharacterType c;
+    if (std::is_same<CharacterType, wchar_t>::value)
     {
         is >> c;
         if (c != L'L')
@@ -572,16 +547,16 @@ std::basic_istream<CharType, TraitsType>& operator>>(
         {
             auto esc_it {std::find_if(
                     std::begin(str.escape_seqs), std::end(str.escape_seqs),
-                    [&c](const escape_seq<CharType>& seq){ return seq.symbol == c; })};
+                    [&c](const escape_seq<CharacterType>& seq){ return seq.symbol == c; })};
             if (esc_it != std::end(str.escape_seqs))  // standard escape sequence
             {
                 temp += esc_it->actual;
             }
-            else if (c == CharType('x')) // custom hex escape sequence
+            else if (c == CharacterType('x')) // custom hex escape sequence
             {
                 int hex_val;
                 is >> std::hex >> std::setw(2) >> hex_val;
-                temp += CharType(hex_val);
+                temp += CharacterType(hex_val);
             }
             else  // invalid escape
             {
@@ -606,7 +581,8 @@ std::basic_istream<CharType, TraitsType>& operator>>(
 // default is string literals, with most ASCII escapes plus hex escapes
 template<typename CharacterType, typename TraitsType>
 std::basic_ios<CharacterType, TraitsType>& literalrepr(
-    std::basic_ios<CharacterType, TraitsType>& stream) {
+    std::basic_ios<CharacterType, TraitsType>& stream)
+{
     stream.iword(detail::get_manip_i()) = detail::repr::literal;
     return stream;
 }
@@ -614,7 +590,8 @@ std::basic_ios<CharacterType, TraitsType>& literalrepr(
 // only escape char and delimiter escaped
 template<typename CharacterType, typename TraitsType>
 std::basic_ios<CharacterType, TraitsType>& quotedrepr(
-    std::basic_ios<CharacterType, TraitsType>& stream) {
+    std::basic_ios<CharacterType, TraitsType>& stream)
+{
     stream.iword(detail::get_manip_i()) = detail::repr::quoted;
     return stream;
 }
@@ -625,38 +602,38 @@ std::basic_ios<CharacterType, TraitsType>& quotedrepr(
  * @param delim  Character to quote string with.
  * @param escape Escape character to escape itself or quote character.
  */
-template<typename CharType>
+template<typename CharacterType>
 inline auto literal(
-    const CharType* string, CharType delim = CharType('"'),
-    CharType escape = CharType('\\')) ->
-    detail::string_literal<const CharType*, CharType>
+    const CharacterType* string, CharacterType delim = CharacterType('"'),
+    CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<const CharacterType*, CharacterType>
 {
-    return detail::string_literal<
-        std::basic_string<CharType>, CharType>(
-            std::basic_string<CharType>(string), delim, escape);
+    return detail::string_repr<
+        std::basic_string<CharacterType>, CharacterType>(
+            std::basic_string<CharacterType>(string), delim, escape);
 }
 
-template<typename CharType, typename TraitsType, typename AllocatorType>
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
 inline auto literal(
-    const std::basic_string<CharType, TraitsType, AllocatorType>& string,
-    CharType delim = CharType('"'), CharType escape = CharType('\\')) ->
-    detail::string_literal<
-	const std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>
+    const std::basic_string<CharacterType, TraitsType, AllocatorType>& string,
+    CharacterType delim = CharacterType('"'), CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<
+	const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>
 {
-    return detail::string_literal<
-	const std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>(
+    return detail::string_repr<
+	const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
 	    string, delim, escape);
 }
 
-template<typename CharType, typename TraitsType, typename AllocatorType>
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
 inline auto literal(
-    std::basic_string<CharType, TraitsType, AllocatorType>& string,
-       CharType delim = CharType('"'), CharType escape = CharType('\\')) ->
-    detail::string_literal<
-        std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>
+    std::basic_string<CharacterType, TraitsType, AllocatorType>& string,
+       CharacterType delim = CharacterType('"'), CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<
+        std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>
 {
-    return detail::string_literal<
-        std::basic_string<CharType, TraitsType, AllocatorType>&, CharType>(
+    return detail::string_repr<
+        std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
             string, delim, escape);
 }
 
@@ -673,7 +650,7 @@ struct tuple_handler
     print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
     {
         stream << std::get<Index>(container);
-        formatter.print_delimiter(stream);
+        formatter.print_separator(stream);
         tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
     }
 
@@ -682,7 +659,7 @@ struct tuple_handler
     parse(StreamType& stream, TupleType& container, const FormatterType& formatter)
     {
         stream >> std::get<Index>(container);
-        formatter.parse_delimiter(stream);
+        formatter.parse_separator(stream);
         tuple_handler<TupleType, Index + 1, Last>::parse(stream, container, formatter);
     }
 };
@@ -781,11 +758,11 @@ struct default_formatter
         istream >> std::ws >> element;
     }
 
-    template <typename CharType>
-    static void parse_char(StreamType& istream, CharType& element) noexcept
+    template <typename CharacterType>
+    static void parse_char(StreamType& istream, CharacterType& element) noexcept
     {
-        std::basic_string<CharType> s;
-        istream >> std::ws >> strings::literal(s, CharType('\''));
+        std::basic_string<CharacterType> s;
+        istream >> std::ws >> strings::literal(s, CharacterType('\''));
         if (s.size() != 1)
         {
             istream.setstate(std::ios_base::failbit);
@@ -804,10 +781,10 @@ struct default_formatter
         parse_char<wchar_t>(istream, element);
     }
 
-    template <typename CharType, std::size_t ArraySize>
-    static void parse_char_array(StreamType& istream, CharType (&element)[ArraySize]) noexcept
+    template <typename CharacterType, std::size_t ArraySize>
+    static void parse_char_array(StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
     {
-        std::basic_string<CharType> s;
+        std::basic_string<CharacterType> s;
         istream >> std::ws >> strings::literal(s);
         if (s.size() > ArraySize - 1)
         {
@@ -815,7 +792,7 @@ struct default_formatter
             return;
         }
         auto it {std::copy(s.begin(), s.end(), std::begin(element))};
-        std::fill(it, std::end(element), CharType('\0'));
+        std::fill(it, std::end(element), CharacterType('\0'));
     }
 
     template <std::size_t ArraySize>
@@ -882,9 +859,9 @@ struct default_formatter
         container.emplace(element);
     }
 
-    static void parse_delimiter(StreamType& istream) noexcept
+    static void parse_separator(StreamType& istream) noexcept
     {
-        extract_token(istream, decorators.delimiter);
+        extract_token(istream, decorators.separator);
     }
 
     static void parse_suffix(StreamType& istream) noexcept
@@ -942,7 +919,7 @@ static StreamType& array_from_stream(
     ++tc_it;
 
     for (; !istream.eof() && tc_it != tc_end; ++tc_it) {
-        formatter.parse_delimiter(istream);
+        formatter.parse_separator(istream);
         if (!istream.good())
             return istream;
 
@@ -1017,7 +994,7 @@ static StreamType& from_stream(
     if (!istream.good())
         return istream;
 
-    formatter.parse_delimiter(istream);
+    formatter.parse_separator(istream);
     if (!istream.good())
         return istream;
 
@@ -1074,7 +1051,7 @@ static StreamType& from_stream(
                 istream.clear();
         }
 
-        formatter.parse_delimiter(istream);
+        formatter.parse_separator(istream);
         if (!istream.good())
             return istream;
 
@@ -1152,9 +1129,9 @@ struct default_formatter
     }
 
 #endif
-    static void print_delimiter(StreamType& stream) noexcept
+    static void print_separator(StreamType& stream) noexcept
     {
-        stream << decorators.delimiter << decorators.whitespace;
+        stream << decorators.separator << decorators.whitespace;
     }
 
     static void print_suffix(StreamType& stream) noexcept
@@ -1191,7 +1168,7 @@ static StreamType& to_stream(
 {
     formatter.print_prefix(stream);
     formatter.print_element(stream, container.first);
-    formatter.print_delimiter(stream);
+    formatter.print_separator(stream);
     formatter.print_element(stream, container.second);
     formatter.print_suffix(stream);
 
@@ -1226,7 +1203,7 @@ static StreamType& to_stream(
 #else
                   [&stream, &formatter](const decltype(*begin)& element) {
 #endif
-        formatter.print_delimiter(stream);
+        formatter.print_separator(stream);
         formatter.print_element(stream, element);
     });
 
