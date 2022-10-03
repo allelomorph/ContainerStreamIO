@@ -391,7 +391,8 @@ struct ascii_escape
             {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
             {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
             // \', \", and \\ handled by choosing custom delim/escape chars per task
-            // \? and trigraphs ignored for now, see:
+            // \? only extracted into ? by operator>>(string_repr)
+            // trigraphs ignored for now, see:
             //   - https://en.cppreference.com/w/c/language/operator_alternative
         }
     };
@@ -538,7 +539,8 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
         istream >> c;
         if (!istream.good())
             break;
-        if (c == str.escape || c == str.delim)
+        // "\?" -> '?' omitted from ascii_escapes as it is only relevant during extraction
+        if (c == str.escape || c == str.delim || c == CharacterType('?'))
         {
             temp += c;
         }
