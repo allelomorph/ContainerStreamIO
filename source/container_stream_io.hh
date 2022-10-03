@@ -63,17 +63,17 @@ struct is_parseable_as_container : public std::false_type
 // std::array, std::vector, std::deque
 // std::forward_list, std::list
 // std::(unordered_)(multi)set, std::(unordered_)(multi)map
-// not std::stack, std::queue, std::priority_queue (have empty(), but not begin() and end())
+// not std::stack, std::queue, std::priority_queue (have value_type, but not clear())
 /**
  * @brief Specialization to ensure that Standard Library compatible containers that have
- * `begin()`, `end()`, and `empty()` member functions are treated as parseable containers.
+ * members `value_type` and `clear()`, plus  functions are treated as parseable containers.
  */
 template <typename Type>
 struct is_parseable_as_container<
     Type, std::void_t<
-              typename Type::iterator, decltype(std::declval<Type&>().begin()),
-              decltype(std::declval<Type&>().end()), decltype(std::declval<Type&>().empty())>>
-    : public std::true_type
+              typename Type::value_type, decltype(std::declval<Type&>().clear())>>
+    : public std::integral_constant<
+    bool, std::is_move_constructible<typename Type::value_type>::value>
 {};
 
 /**
@@ -82,7 +82,6 @@ struct is_parseable_as_container<
 template <typename FirstType, typename SecondType>
 struct is_parseable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
 {};
-
 
 /**
  * @brief Specialization to treat std::tuple<...> as a parseable container type.
@@ -721,7 +720,6 @@ static void extract_token(
         std::basic_string<CharacterType>{token}
 #endif
     };
-    // no check for size of 0 needed, as then begin() == end()
     istream >> std::ws;
     auto it_1 {token_s.begin()};
     while (!istream.eof() && it_1 != token_s.end() &&
@@ -743,9 +741,6 @@ struct default_formatter
 {
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
-
-    // TBD: maybe instead of templated ElementType for insertion, we tie
-    //   to ContainerType with" `using element_type = typename ContainerType::value_type`
 
     static void parse_prefix(StreamType& istream) noexcept
     {
