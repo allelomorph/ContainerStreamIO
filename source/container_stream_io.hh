@@ -454,7 +454,7 @@ enum repr { literal, quoted };
  */
 template<typename CharacterType, typename TraitsType, typename AllocatorType>
 std::basic_ostream<CharacterType, TraitsType>& operator<<(
-    std::basic_ostream<CharacterType, TraitsType>& os,
+    std::basic_ostream<CharacterType, TraitsType>& ostream,
     const string_repr<
     const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
 {
@@ -473,7 +473,7 @@ std::basic_ostream<CharacterType, TraitsType>& operator<<(
                 oss << str.escape;
             oss << c;
         }
-        else if (os.iword(get_manip_i()) == repr::literal)
+        else if (ostream.iword(get_manip_i()) == repr::literal)
         {
             oss << str.escape;
             auto esc_it {std::find_if(
@@ -494,7 +494,7 @@ std::basic_ostream<CharacterType, TraitsType>& operator<<(
     }
     oss << str.delim;
 
-    return os << oss.str();
+    return ostream << oss.str();
 }
 
 /**
@@ -505,44 +505,44 @@ std::basic_ostream<CharacterType, TraitsType>& operator<<(
  */
 template<typename CharacterType, typename TraitsType, typename AllocatorType>
 std::basic_istream<CharacterType, TraitsType>& operator>>(
-    std::basic_istream<CharacterType, TraitsType>& is,
+    std::basic_istream<CharacterType, TraitsType>& istream,
     const string_repr<std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
 {
     CharacterType c;
     if (std::is_same<CharacterType, wchar_t>::value)
     {
-        is >> c;
+        istream >> c;
         if (c != L'L')
-            is.setstate(std::ios_base::failbit);
-        if (!is.good())
-            return is;
+            istream.setstate(std::ios_base::failbit);
+        if (!istream.good())
+            return istream;
     }
-    is >> c;
+    istream >> c;
     if (c != str.delim)
-        is.setstate(std::ios_base::failbit);
-    if (!is.good())
-        return is;
+        istream.setstate(std::ios_base::failbit);
+    if (!istream.good())
+        return istream;
     std::decay_t<decltype(str.string)> temp;
     std::ios_base::fmtflags flags
-        = is.flags(is.flags() & ~std::ios_base::skipws);
+        = istream.flags(istream.flags() & ~std::ios_base::skipws);
     do
     {
-        is >> c;
-        if (!is.good() || c == str.delim)
+        istream >> c;
+        if (!istream.good() || c == str.delim)
             break;
         if (c != str.escape)
         {
             temp += c;
             continue;
         }
-        is >> c;
-        if (!is.good())
+        istream >> c;
+        if (!istream.good())
             break;
         if (c == str.escape || c == str.delim)
         {
             temp += c;
         }
-        else if (is.iword(get_manip_i()) == repr::literal)
+        else if (istream.iword(get_manip_i()) == repr::literal)
         {
             auto esc_it {std::find_if(
                     std::begin(str.escape_seqs), std::end(str.escape_seqs),
@@ -554,25 +554,25 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
             else if (c == CharacterType('x')) // custom hex escape sequence
             {
                 int hex_val;
-                is >> std::hex >> std::setw(2) >> hex_val;
+                istream >> std::hex >> std::setw(2) >> hex_val;
                 temp += CharacterType(hex_val);
             }
             else  // invalid escape
             {
-                is.setstate(std::ios_base::failbit);
+                istream.setstate(std::ios_base::failbit);
             }
         }
         else  // invalid escape
         {
-            is.setstate(std::ios_base::failbit);
+            istream.setstate(std::ios_base::failbit);
         }
-    } while (is.good());
+    } while (istream.good());
     if (c != str.delim)
-        is.setstate(std::ios_base::failbit);
-    is.setf(flags);
-    if (!is.fail() && !is.bad())
+        istream.setstate(std::ios_base::failbit);
+    istream.setf(flags);
+    if (!istream.fail() && !istream.bad())
         str.string = std::move(temp);
-    return is;
+    return istream;
 }
 
 }  // namespace detail
@@ -646,20 +646,20 @@ struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
     static void
-    print(StreamType& stream, const TupleType& container, const FormatterType& formatter)
+    print(StreamType& ostream, const TupleType& container, const FormatterType& formatter)
     {
-        stream << std::get<Index>(container);
-        formatter.print_separator(stream);
-        tuple_handler<TupleType, Index + 1, Last>::print(stream, container, formatter);
+        ostream << std::get<Index>(container);
+        formatter.print_separator(ostream);
+        tuple_handler<TupleType, Index + 1, Last>::print(ostream, container, formatter);
     }
 
     template <typename StreamType, typename FormatterType>
     static void
-    parse(StreamType& stream, TupleType& container, const FormatterType& formatter)
+    parse(StreamType& istream, TupleType& container, const FormatterType& formatter)
     {
-        stream >> std::get<Index>(container);
-        formatter.parse_separator(stream);
-        tuple_handler<TupleType, Index + 1, Last>::parse(stream, container, formatter);
+        istream >> std::get<Index>(container);
+        formatter.parse_separator(istream);
+        tuple_handler<TupleType, Index + 1, Last>::parse(istream, container, formatter);
     }
 };
 
@@ -672,16 +672,16 @@ struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
     static void
-    print(StreamType& stream, const TupleType& tuple, const FormatterType& formatter) noexcept
+    print(StreamType& ostream, const TupleType& tuple, const FormatterType& formatter) noexcept
     {
-        formatter.print_element(stream, std::get<Index>(tuple));
+        formatter.print_element(ostream, std::get<Index>(tuple));
     }
 
     template <typename StreamType, typename FormatterType>
     static void
-    parse(StreamType& stream, TupleType& tuple, const FormatterType& formatter) noexcept
+    parse(StreamType& istream, TupleType& tuple, const FormatterType& formatter) noexcept
     {
-        formatter.parse_element(stream, std::get<Index>(tuple));
+        formatter.parse_element(istream, std::get<Index>(tuple));
     }
 };
 
@@ -957,19 +957,19 @@ static StreamType& from_stream(
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& from_stream(
-    StreamType& stream, std::tuple<TupleArgs...>& container,
+    StreamType& istream, std::tuple<TupleArgs...>& container,
     const FormatterType& formatter)
 {
     using ContainerType = std::decay_t<decltype(container)>;
 
     // TBD: currently no checks for stream fails for malformed serialiation,
     //   modifying tuple directly instead of temp working copy
-    formatter.parse_prefix(stream);
+    formatter.parse_prefix(istream);
     container_stream_io::tuple_handler<
-        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(stream, container, formatter);
-    formatter.parse_suffix(stream);
+        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(istream, container, formatter);
+    formatter.parse_suffix(istream);
 
-    return stream;
+    return istream;
 }
 
 template <typename FirstType, typename SecondType,
@@ -1007,7 +1007,7 @@ static StreamType& from_stream(
     return istream;
 }
 
-// "generic" overload, but requires value_type, .clear(), move assignment of container and elements
+// "generic" overload, but requires value_type, clear(), move assignment of container and elements
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
     StreamType& istream, ContainerType& container,
@@ -1075,63 +1075,63 @@ struct default_formatter
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
 
-    static void print_prefix(StreamType& stream) noexcept
+    static void print_prefix(StreamType& ostream) noexcept
     {
-        stream << decorators.prefix;
+        ostream << decorators.prefix;
     }
 
     template <typename ElementType>
-    static void print_element(StreamType& stream, const ElementType& element) noexcept
+    static void print_element(StreamType& ostream, const ElementType& element) noexcept
     {
-        stream << element;
+        ostream << element;
     }
 
-    static void print_element(StreamType& stream, const char& element) noexcept
+    static void print_element(StreamType& ostream, const char& element) noexcept
     {
-        stream << strings::literal(std::string({element}), '\'');
+        ostream << strings::literal(std::string({element}), '\'');
     }
 
-    static void print_element(StreamType& stream, const wchar_t& element) noexcept
+    static void print_element(StreamType& ostream, const wchar_t& element) noexcept
     {
-        stream << strings::literal(std::wstring({element}), L'\'');
-    }
-
-    template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const char (&element)[ArraySize]) noexcept
-    {
-        stream << strings::literal(element);
+        ostream << strings::literal(std::wstring({element}), L'\'');
     }
 
     template <std::size_t ArraySize>
-    static void print_element(StreamType& stream, const wchar_t (&element)[ArraySize]) noexcept
+    static void print_element(StreamType& ostream, const char (&element)[ArraySize]) noexcept
     {
-        stream << strings::literal(element);
+        ostream << strings::literal(element);
+    }
+
+    template <std::size_t ArraySize>
+    static void print_element(StreamType& ostream, const wchar_t (&element)[ArraySize]) noexcept
+    {
+        ostream << strings::literal(element);
     }
 
     template<typename CharacterType>
-    static void print_element(StreamType& stream,
+    static void print_element(StreamType& ostream,
                               const std::basic_string<CharacterType>& element) noexcept
     {
-        stream << strings::literal(element);
+        ostream << strings::literal(element);
     }
 
 #if (__cplusplus >= 201703L)
     template<typename CharacterType>
-    static void print_element(StreamType& stream,
+    static void print_element(StreamType& ostream,
                               const std::basic_string_view<CharacterType>& element) noexcept
     {
-        stream << strings::literal(element);
+        ostream << strings::literal(element);
     }
 
 #endif
-    static void print_separator(StreamType& stream) noexcept
+    static void print_separator(StreamType& ostream) noexcept
     {
-        stream << decorators.separator << decorators.whitespace;
+        ostream << decorators.separator << decorators.whitespace;
     }
 
-    static void print_suffix(StreamType& stream) noexcept
+    static void print_suffix(StreamType& ostream) noexcept
     {
-        stream << decorators.suffix;
+        ostream << decorators.suffix;
     }
 };
 
@@ -1140,17 +1140,17 @@ struct default_formatter
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& to_stream(
-    StreamType& stream, const std::tuple<TupleArgs...>& container,
+    StreamType& ostream, const std::tuple<TupleArgs...>& container,
     const FormatterType& formatter)
 {
     using ContainerType = std::decay_t<decltype(container)>;
 
-    formatter.print_prefix(stream);
+    formatter.print_prefix(ostream);
     container_stream_io::tuple_handler<
-        ContainerType, 0, sizeof...(TupleArgs) - 1>::print(stream, container, formatter);
-    formatter.print_suffix(stream);
+        ContainerType, 0, sizeof...(TupleArgs) - 1>::print(ostream, container, formatter);
+    formatter.print_suffix(ostream);
 
-    return stream;
+    return ostream;
 }
 
 /**
@@ -1158,16 +1158,16 @@ static StreamType& to_stream(
  */
 template <typename FirstType, typename SecondType, typename StreamType, typename FormatterType>
 static StreamType& to_stream(
-    StreamType& stream, const std::pair<FirstType, SecondType>& container,
+    StreamType& ostream, const std::pair<FirstType, SecondType>& container,
     const FormatterType& formatter)
 {
-    formatter.print_prefix(stream);
-    formatter.print_element(stream, container.first);
-    formatter.print_separator(stream);
-    formatter.print_element(stream, container.second);
-    formatter.print_suffix(stream);
+    formatter.print_prefix(ostream);
+    formatter.print_element(ostream, container.first);
+    formatter.print_separator(ostream);
+    formatter.print_element(ostream, container.second);
+    formatter.print_suffix(ostream);
 
-    return stream;
+    return ostream;
 }
 
 /**
@@ -1176,35 +1176,35 @@ static StreamType& to_stream(
  */
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& to_stream(
-    StreamType& stream, const ContainerType& container,
+    StreamType& ostream, const ContainerType& container,
     const FormatterType& formatter)
 {
-    formatter.print_prefix(stream);
+    formatter.print_prefix(ostream);
 
     if (container_stream_io::traits::is_empty(container)) {
-        formatter.print_suffix(stream);
+        formatter.print_suffix(ostream);
 
-        return stream;
+        return ostream;
     }
 
     auto begin = std::begin(container);
-    formatter.print_element(stream, *begin);
+    formatter.print_element(ostream, *begin);
 
     std::advance(begin, 1);
 
     std::for_each(begin, std::end(container),
 #ifdef __cpp_generic_lambdas
-                  [&stream, &formatter](const auto& element) {
+                  [&ostream, &formatter](const auto& element) {
 #else
-                  [&stream, &formatter](const decltype(*begin)& element) {
+                  [&ostream, &formatter](const decltype(*begin)& element) {
 #endif
-        formatter.print_separator(stream);
-        formatter.print_element(stream, element);
+        formatter.print_separator(ostream);
+        formatter.print_element(ostream, element);
     });
 
-    formatter.print_suffix(stream);
+    formatter.print_suffix(ostream);
 
-    return stream;
+    return ostream;
 }
 
 } // namespace output
