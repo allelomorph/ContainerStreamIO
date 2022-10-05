@@ -372,6 +372,9 @@ namespace strings {
 
 namespace detail {
 
+// labels for flag values used to set string representation type
+enum class repr { literal, quoted };
+
 template<typename CharacterType>
 struct escape_seq
 {
@@ -412,14 +415,16 @@ struct string_repr
     CharacterType delim;
     CharacterType escape;
 
+    repr type;
+
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
     static constexpr decltype(ascii_escape<CharacterType>::seqs) escape_seqs {
         ascii_escape<CharacterType>::seqs};
 
     string_repr(void) = delete;
-    string_repr(StringType str, CharacterType dlm, CharacterType esc)
-	: string(str), delim{dlm}, escape{esc}
+    string_repr(StringType str, CharacterType dlm, CharacterType esc, repr t)
+	: string(str), delim{dlm}, escape{esc}, type{t}
     {
         // relies on implicit conversion of char to wchar_t in iswprint()
         if (!std::iswprint(dlm) || !std::iswprint(esc))
@@ -447,9 +452,6 @@ static inline int get_manip_i()
     return i;
 }
 
-// labels for flag values used to set string representation type
-enum repr { literal, quoted };
-
 /**
  * @brief Inserter for quoted strings.
  */
@@ -474,7 +476,7 @@ std::basic_ostream<CharacterType, TraitsType>& operator<<(
                 oss << str.escape;
             oss << c;
         }
-        else if (ostream.iword(get_manip_i()) == repr::literal)
+        else if (str.type == repr::literal)
         {
             oss << str.escape;
             auto esc_it {std::find_if(
@@ -544,7 +546,7 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
         {
             temp += c;
         }
-        else if (istream.iword(get_manip_i()) == repr::literal)
+        else if (str.type == repr::literal)
         {
             auto esc_it {std::find_if(
                     std::begin(str.escape_seqs), std::end(str.escape_seqs),
@@ -604,6 +606,41 @@ std::basic_ios<CharacterType, TraitsType>& quotedrepr(
  * @param escape Escape character to escape itself or quote character.
  */
 template<typename CharacterType>
+inline auto quoted(
+    const CharacterType* string, CharacterType delim = CharacterType('"'),
+    CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<const CharacterType*, CharacterType>
+{
+    return detail::string_repr<
+        std::basic_string<CharacterType>, CharacterType>(
+            std::basic_string<CharacterType>(string), delim, escape, detail::repr::quoted);
+}
+
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
+inline auto quoted(
+    const std::basic_string<CharacterType, TraitsType, AllocatorType>& string,
+    CharacterType delim = CharacterType('"'), CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<
+	const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>
+{
+    return detail::string_repr<
+	const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
+	    string, delim, escape, detail::repr::quoted);
+}
+
+template<typename CharacterType, typename TraitsType, typename AllocatorType>
+inline auto quoted(
+    std::basic_string<CharacterType, TraitsType, AllocatorType>& string,
+       CharacterType delim = CharacterType('"'), CharacterType escape = CharacterType('\\')) ->
+    detail::string_repr<
+        std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>
+{
+    return detail::string_repr<
+        std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
+            string, delim, escape, detail::repr::quoted);
+}
+
+template<typename CharacterType>
 inline auto literal(
     const CharacterType* string, CharacterType delim = CharacterType('"'),
     CharacterType escape = CharacterType('\\')) ->
@@ -611,7 +648,7 @@ inline auto literal(
 {
     return detail::string_repr<
         std::basic_string<CharacterType>, CharacterType>(
-            std::basic_string<CharacterType>(string), delim, escape);
+            std::basic_string<CharacterType>(string), delim, escape, detail::repr::literal);
 }
 
 template<typename CharacterType, typename TraitsType, typename AllocatorType>
@@ -623,7 +660,7 @@ inline auto literal(
 {
     return detail::string_repr<
 	const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
-	    string, delim, escape);
+	    string, delim, escape, detail::repr::literal);
 }
 
 template<typename CharacterType, typename TraitsType, typename AllocatorType>
@@ -635,7 +672,7 @@ inline auto literal(
 {
     return detail::string_repr<
         std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>(
-            string, delim, escape);
+            string, delim, escape, detail::repr::literal);
 }
 
 }  // namespace strings
@@ -759,7 +796,11 @@ struct default_formatter
     static void parse_char(StreamType& istream, CharacterType& element) noexcept
     {
         std::basic_string<CharacterType> s;
-        istream >> std::ws >> strings::literal(s, CharacterType('\''));
+        using repr = strings::detail::repr;
+        if ((repr)istream.iword(strings::detail::get_manip_i()) == repr::quoted)
+            istream >> std::ws >> strings::quoted(s, CharacterType('\''));
+        else
+            istream >> std::ws >> strings::literal(s, CharacterType('\''));
         if (s.size() != 1)
         {
             istream.setstate(std::ios_base::failbit);
@@ -782,7 +823,11 @@ struct default_formatter
     static void parse_char_array(StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
     {
         std::basic_string<CharacterType> s;
-        istream >> std::ws >> strings::literal(s);
+        using repr = strings::detail::repr;
+        if ((repr)istream.iword(strings::detail::get_manip_i()) == repr::quoted)
+            istream >> std::ws >> strings::quoted(s);
+        else
+            istream >> std::ws >> strings::literal(s);
         if (s.size() > ArraySize - 1)
         {
             istream.setstate(std::ios_base::failbit);
@@ -808,7 +853,11 @@ struct default_formatter
     static void parse_element(StreamType& istream,
                               std::basic_string<CharacterType>& element) noexcept
     {
-        istream >> std::ws >> strings::literal(element);
+        using repr = strings::detail::repr;
+        if ((repr)istream.iword(strings::detail::get_manip_i()) == repr::quoted)
+            istream >> std::ws >> strings::quoted(element);
+        else
+            istream >> std::ws >> strings::literal(element);
     }
 
 #if (__cplusplus >= 201703L)
@@ -817,12 +866,15 @@ struct default_formatter
                               std::basic_string_view<CharacterType>& element) noexcept
     {
         std::basic_string<CharacterType> s;
-        istream >> std::ws >> strings::literal(s);
+        using repr = strings::detail::repr;
+        if ((repr)istream.iword(strings::detail::get_manip_i()) == repr::quoted)
+            istream >> std::ws >> strings::quoted(s);
+        else
+            istream >> std::ws >> strings::literal(s);
         element = std::basic_string_view<CharacterType> {s.c_str()};
     }
 
 #endif
-
     // std::forward_list
     template <typename ElementType>
     static auto insert_element(
@@ -1088,33 +1140,59 @@ struct default_formatter
         ostream << element;
     }
 
+    template<typename CharacterType>
+    static void print_char(StreamType& ostream, const CharacterType& element) noexcept
+    {
+        using repr = strings::detail::repr;
+        if ((repr)ostream.iword(strings::detail::get_manip_i()) == repr::quoted)
+        {
+            ostream << strings::quoted(
+                std::basic_string<CharacterType>({element}), CharacterType('\''));
+        }
+        else
+        {
+            ostream << strings::literal(
+                std::basic_string<CharacterType>({element}), CharacterType('\''));
+        }
+    }
+
     static void print_element(StreamType& ostream, const char& element) noexcept
     {
-        ostream << strings::literal(std::string({element}), '\'');
+        print_char(ostream, element);
     }
 
     static void print_element(StreamType& ostream, const wchar_t& element) noexcept
     {
-        ostream << strings::literal(std::wstring({element}), L'\'');
+        print_char(ostream, element);
+    }
+
+    template <typename StringType>
+    static void print_string(StreamType& ostream, const StringType& element) noexcept
+    {
+        using repr = strings::detail::repr;
+        if ((repr)ostream.iword(strings::detail::get_manip_i()) == repr::quoted)
+            ostream << strings::quoted(element);
+        else
+            ostream << strings::literal(element);
     }
 
     template <std::size_t ArraySize>
     static void print_element(StreamType& ostream, const char (&element)[ArraySize]) noexcept
     {
-        ostream << strings::literal(element);
+        print_string(ostream, element);
     }
 
     template <std::size_t ArraySize>
     static void print_element(StreamType& ostream, const wchar_t (&element)[ArraySize]) noexcept
     {
-        ostream << strings::literal(element);
+        print_string(ostream, element);
     }
 
     template<typename CharacterType>
     static void print_element(StreamType& ostream,
                               const std::basic_string<CharacterType>& element) noexcept
     {
-        ostream << strings::literal(element);
+        print_string(ostream, element);
     }
 
 #if (__cplusplus >= 201703L)
@@ -1122,7 +1200,7 @@ struct default_formatter
     static void print_element(StreamType& ostream,
                               const std::basic_string_view<CharacterType>& element) noexcept
     {
-        ostream << strings::literal(element);
+        print_string(ostream, element);
     }
 
 #endif
