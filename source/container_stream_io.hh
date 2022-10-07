@@ -951,7 +951,8 @@ struct tuple_handler
     {
         istream >> std::get<Index>(container);
         formatter.parse_separator(istream);
-        tuple_handler<TupleType, Index + 1, Last>::parse(istream, container, formatter);
+        if (istream.good())
+            tuple_handler<TupleType, Index + 1, Last>::parse(istream, container, formatter);
     }
 };
 
@@ -966,7 +967,8 @@ struct tuple_handler<TupleType, Index, Index>
     static void
     parse(StreamType& istream, TupleType& tuple, const FormatterType& formatter) noexcept
     {
-        formatter.parse_element(istream, std::get<Index>(tuple));
+        if (istream.good())
+            formatter.parse_element(istream, std::get<Index>(tuple));
     }
 };
 
@@ -993,13 +995,13 @@ static StreamType& from_stream(
 {
     using ContainerType = std::decay_t<decltype(container)>;
 
-    // TBD: currently no checks for stream fails for malformed serialiation,
-    //   modifying tuple directly instead of temp working copy
+    ContainerType temp;
     formatter.parse_prefix(istream);
     container_stream_io::input::tuple_handler<
-        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(istream, container, formatter);
+        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(istream, temp, formatter);
     formatter.parse_suffix(istream);
-
+    if (!istream.fail() && !istream.bad())
+        container = std::move(temp);
     return istream;
 }
 
