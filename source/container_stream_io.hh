@@ -528,11 +528,7 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
     std::decay_t<decltype(str.string)> temp;
     std::ios_base::fmtflags flags
         = istream.flags(istream.flags() & ~std::ios_base::skipws);
-    do
-    {
-        istream >> c;
-        if (!istream.good() || c == str.delim)
-            break;
+    for (istream >> c; istream.good() && c != str.delim; istream >> c) {
         if (c != str.escape)
         {
             temp += c;
@@ -541,36 +537,38 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
         istream >> c;
         if (!istream.good())
             break;
-        // "\?" -> '?' omitted from ascii_escapes as it is only relevant during extraction
-        if (c == str.escape || c == str.delim || c == CharacterType('?'))
+        if (c == str.escape || c == str.delim)
         {
             temp += c;
+            continue;
         }
-        else if (str.type == repr::literal)
+        if (str.type == repr::literal)
         {
+            // "\?" -> '?' omitted from ascii_escapes as it is only relevant during extraction
+            if (c == CharacterType('?'))
+            {
+                temp += c;
+                continue;
+            }
             auto esc_it {std::find_if(
                     std::begin(str.escape_seqs), std::end(str.escape_seqs),
                     [&c](const escape_seq<CharacterType>& seq){ return seq.symbol == c; })};
             if (esc_it != std::end(str.escape_seqs))  // standard escape sequence
             {
                 temp += esc_it->actual;
+                continue;
             }
             else if (c == CharacterType('x')) // custom hex escape sequence
             {
                 int hex_val;
                 istream >> std::hex >> std::setw(2) >> hex_val;
                 temp += CharacterType(hex_val);
-            }
-            else  // invalid escape
-            {
-                istream.setstate(std::ios_base::failbit);
+                continue;
             }
         }
-        else  // invalid escape
-        {
-            istream.setstate(std::ios_base::failbit);
-        }
-    } while (istream.good());
+        // invalid escape
+        istream.setstate(std::ios_base::failbit);
+    };
     if (c != str.delim)
         istream.setstate(std::ios_base::failbit);
     istream.setf(flags);
