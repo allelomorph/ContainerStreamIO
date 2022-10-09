@@ -12,13 +12,15 @@
 
 namespace
 {
+
 /**
  * @brief An RAII wrapper that will execute an action when the wrapper falls out of scope, or is
  * otherwise destroyed.
  */
-template <typename LambdaType> class scope_exit
+template <typename LambdaType>
+class scope_exit
 {
-  public:
+public:
     scope_exit(LambdaType&& lambda) noexcept : m_lambda{ std::move(lambda) }
     {
         static_assert(
@@ -37,11 +39,12 @@ template <typename LambdaType> class scope_exit
     scope_exit(scope_exit&&) = default;
     scope_exit& operator=(scope_exit&&) = default;
 
-  private:
+private:
     LambdaType m_lambda;
 };
 
-template <typename Type> class vector_wrapper : public std::vector<Type>
+template <typename Type>
+class vector_wrapper : public std::vector<Type>
 {
 };
 
@@ -61,7 +64,7 @@ struct custom_formatter
         stream << element;
     }
 
-    template <typename StreamType> void print_delimiter(StreamType& stream) const noexcept
+    template <typename StreamType> void print_separator(StreamType& stream) const noexcept
     {
         stream << L" | ";
     }
@@ -71,6 +74,7 @@ struct custom_formatter
         stream << L" $$";
     }
 };
+
 } // namespace
 
 TEST_CASE("Traits")
@@ -119,7 +123,8 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters = container_stream_io::decorator::delimiters<char[], char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "[" });
-        REQUIRE(delimiters.separator == std::string_view{ ", " });
+        REQUIRE(delimiters.separator == std::string_view{ "," });
+        REQUIRE(delimiters.whitespace == std::string_view{ " " });
         REQUIRE(delimiters.suffix == std::string_view{ "]" });
     }
 
@@ -129,7 +134,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<wchar_t[], wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"[" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
+        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
         REQUIRE(delimiters.suffix == std::wstring_view{ L"]" });
     }
 
@@ -139,7 +145,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::set<int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "{" });
-        REQUIRE(delimiters.separator == std::string_view{ ", " });
+        REQUIRE(delimiters.separator == std::string_view{ "," });
+        REQUIRE(delimiters.whitespace == std::string_view{ " " });
         REQUIRE(delimiters.suffix == std::string_view{ "}" });
     }
 
@@ -149,7 +156,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::set<int>, wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"{" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
+        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
         REQUIRE(delimiters.suffix == std::wstring_view{ L"}" });
     }
 
@@ -159,7 +167,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::pair<int, int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "(" });
-        REQUIRE(delimiters.separator == std::string_view{ ", " });
+        REQUIRE(delimiters.separator == std::string_view{ "," });
+        REQUIRE(delimiters.whitespace == std::string_view{ " " });
         REQUIRE(delimiters.suffix == std::string_view{ ")" });
     }
 
@@ -169,7 +178,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::pair<int, int>, wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"(" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
+        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
         REQUIRE(delimiters.suffix == std::wstring_view{ L")" });
     }
 
@@ -179,7 +189,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::tuple<int, int>, char>::values;
 
         REQUIRE(delimiters.prefix == std::string_view{ "<" });
-        REQUIRE(delimiters.separator == std::string_view{ ", " });
+        REQUIRE(delimiters.separator == std::string_view{ "," });
+        REQUIRE(delimiters.whitespace == std::string_view{ " " });
         REQUIRE(delimiters.suffix == std::string_view{ ">" });
     }
 
@@ -189,7 +200,8 @@ TEST_CASE("Delimiter Validation")
             container_stream_io::decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
 
         REQUIRE(delimiters.prefix == std::wstring_view{ L"<" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L", " });
+        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
+        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
         REQUIRE(delimiters.suffix == std::wstring_view{ L">" });
     }
 }
@@ -385,7 +397,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << map << std::flush;
 
-        REQUIRE(narrow_buffer.str() == "[(1, Template), (2, Meta), (3, Programming)]");
+        REQUIRE(narrow_buffer.str() == "[(1, \"Template\"), (2, \"Meta\"), (3, \"Programming\")]");
     }
 
     SECTION("Printing a populated std::map<...> to a wide stream.")
@@ -396,7 +408,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::wcout << map << std::flush;
 
-        REQUIRE(wide_buffer.str() == L"[(1, Template), (2, Meta), (3, Programming)]");
+        REQUIRE(wide_buffer.str() == L"[(1, L\"Template\"), (2, L\"Meta\"), (3, L\"Programming\")]");
     }
 
     SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
@@ -407,10 +419,10 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << vector << std::flush;
 
-        REQUIRE(narrow_buffer.str() == "[<1, 0.1, Hello>, <2, 0.2, World>]");
+        REQUIRE(narrow_buffer.str() == "[<1, 0.1, \"Hello\">, <2, 0.2, \"World\">]");
     }
 
-    SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
+    SECTION("Printing a populated std::vector<std::tuple<...>> to a wide stream.")
     {
         const auto vector =
             std::vector<std::tuple<int, double, std::wstring>>{ std::make_tuple(1, 0.1, L"Hello"),
@@ -418,7 +430,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::wcout << vector << std::flush;
 
-        REQUIRE(wide_buffer.str() == L"[<1, 0.1, Hello>, <2, 0.2, World>]");
+        REQUIRE(wide_buffer.str() == L"[<1, 0.1, L\"Hello\">, <2, 0.2, L\"World\">]");
     }
 
     SECTION("Printing a populated std::pair<int, std::vector<std::pair<std::string, std::string>>>")
@@ -429,7 +441,7 @@ TEST_CASE("Printing of Nested Containers")
 
         std::cout << pair << std::flush;
 
-        REQUIRE(narrow_buffer.str() == "(10, [(Why, Not?), (Someone, Might!)])");
+        REQUIRE(narrow_buffer.str() == "(10, [(\"Why\", \"Not?\"), (\"Someone\", \"Might!\")])");
     }
 }
 
