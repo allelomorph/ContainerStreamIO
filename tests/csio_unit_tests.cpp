@@ -10,6 +10,10 @@
 #include <set>
 #include <vector>
 
+#if (__cplusplus < 201103L)
+#error "csio_unit_tests.cpp only supports C++11 and above"
+#endif  // pre-C++11
+
 namespace
 {
 
@@ -24,7 +28,11 @@ public:
     scope_exit(LambdaType&& lambda) noexcept : m_lambda{ std::move(lambda) }
     {
         static_assert(
+#if __cplusplus >= 201703L
             std::is_nothrow_invocable<LambdaType>::value,
+#else
+            noexcept(lambda),
+#endif
             "Since the callable type is invoked from the destructor, exceptions are not allowed.");
     }
 
@@ -75,44 +83,85 @@ struct custom_formatter
     }
 };
 
+// C++ idiomatic comparison of C strings (can't overload operator== for fundamental types)
+template <typename CharacterType, std::size_t ArraySize>
+bool c_strings_match(const CharacterType* const& s1,
+                     const CharacterType (&s2)[ArraySize])
+{
+#if __cplusplus >= 201703L
+    return s1 == std::basic_string_view<CharacterType>(s2);
+#else
+    return s1 == std::basic_string<CharacterType>(s2);
+#endif
+}
+
 } // namespace
 
 TEST_CASE("Traits")
 {
     SECTION("Detect std::vector<...> as being an iterable container type.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<std::vector<int>> == true);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<std::vector<int>>::value == true);
+#endif
     }
 
     SECTION("Detect std::list<...> as being an iterable container type.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<std::list<int>> == true);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<std::list<int>>::value == true);
+#endif
     }
 
     SECTION("Detect std::set<...> as being an iterable container type.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<std::set<int>> == true);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<std::set<int>>::value == true);
+#endif
     }
 
     SECTION("Detect array as being an iterable container type.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<int[10]> == true);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<int[10]>::value == true);
+#endif
     }
 
     SECTION("Detect std::string as a type that shouldn't be iterated over.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<std::string> == false);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<std::string>::value == false);
+#endif
     }
 
     SECTION("Detect std::wstring as a type that shouldn't be iterated over.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(container_stream_io::traits::is_printable_as_container_v<std::wstring> == false);
+#else
+        REQUIRE(container_stream_io::traits::is_printable_as_container<std::wstring>::value == false);
+#endif
     }
 
     SECTION("Detect inherited iterable container type.")
     {
+#if __cplusplus >= 201703L
         REQUIRE(
             container_stream_io::traits::is_printable_as_container_v<vector_wrapper<int>> == true);
+#else
+        REQUIRE(
+            container_stream_io::traits::is_printable_as_container<vector_wrapper<int>>::value == true);
+#endif
     }
 }
 
@@ -122,10 +171,10 @@ TEST_CASE("Delimiter Validation")
     {
         constexpr auto delimiters = container_stream_io::decorator::delimiters<char[], char>::values;
 
-        REQUIRE(delimiters.prefix == std::string_view{ "[" });
-        REQUIRE(delimiters.separator == std::string_view{ "," });
-        REQUIRE(delimiters.whitespace == std::string_view{ " " });
-        REQUIRE(delimiters.suffix == std::string_view{ "]" });
+        REQUIRE(c_strings_match(delimiters.prefix,     "[" ));
+        REQUIRE(c_strings_match(delimiters.separator,  "," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, " " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     "]" ));
     }
 
     SECTION("Verify wide character delimiters for a non-specialized container type.")
@@ -133,10 +182,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<wchar_t[], wchar_t>::values;
 
-        REQUIRE(delimiters.prefix == std::wstring_view{ L"[" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
-        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
-        REQUIRE(delimiters.suffix == std::wstring_view{ L"]" });
+        REQUIRE(c_strings_match(delimiters.prefix,     L"[" ));
+        REQUIRE(c_strings_match(delimiters.separator,  L"," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, L" " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     L"]" ));
     }
 
     SECTION("Verify narrow character delimiters for a std::set<...>.")
@@ -144,10 +193,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::set<int>, char>::values;
 
-        REQUIRE(delimiters.prefix == std::string_view{ "{" });
-        REQUIRE(delimiters.separator == std::string_view{ "," });
-        REQUIRE(delimiters.whitespace == std::string_view{ " " });
-        REQUIRE(delimiters.suffix == std::string_view{ "}" });
+        REQUIRE(c_strings_match(delimiters.prefix,     "{" ));
+        REQUIRE(c_strings_match(delimiters.separator,  "," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, " " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     "}" ));
     }
 
     SECTION("Verify wide character delimiters for a std::set<...>.")
@@ -155,10 +204,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::set<int>, wchar_t>::values;
 
-        REQUIRE(delimiters.prefix == std::wstring_view{ L"{" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
-        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
-        REQUIRE(delimiters.suffix == std::wstring_view{ L"}" });
+        REQUIRE(c_strings_match(delimiters.prefix,     L"{" ));
+        REQUIRE(c_strings_match(delimiters.separator,  L"," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, L" " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     L"}" ));
     }
 
     SECTION("Verify narrow character delimiters for a std::pair<...>.")
@@ -166,10 +215,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::pair<int, int>, char>::values;
 
-        REQUIRE(delimiters.prefix == std::string_view{ "(" });
-        REQUIRE(delimiters.separator == std::string_view{ "," });
-        REQUIRE(delimiters.whitespace == std::string_view{ " " });
-        REQUIRE(delimiters.suffix == std::string_view{ ")" });
+        REQUIRE(c_strings_match(delimiters.prefix,     "(" ));
+        REQUIRE(c_strings_match(delimiters.separator,  "," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, " " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     ")" ));
     }
 
     SECTION("Verify wide character delimiters for a std::pair<...>.")
@@ -177,10 +226,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::pair<int, int>, wchar_t>::values;
 
-        REQUIRE(delimiters.prefix == std::wstring_view{ L"(" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
-        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
-        REQUIRE(delimiters.suffix == std::wstring_view{ L")" });
+        REQUIRE(c_strings_match(delimiters.prefix,     L"(" ));
+        REQUIRE(c_strings_match(delimiters.separator,  L"," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, L" " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     L")" ));
     }
 
     SECTION("Verify narrow character delimiters for a std::tuple<...>.")
@@ -188,10 +237,10 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::tuple<int, int>, char>::values;
 
-        REQUIRE(delimiters.prefix == std::string_view{ "<" });
-        REQUIRE(delimiters.separator == std::string_view{ "," });
-        REQUIRE(delimiters.whitespace == std::string_view{ " " });
-        REQUIRE(delimiters.suffix == std::string_view{ ">" });
+        REQUIRE(c_strings_match(delimiters.prefix,     "<" ));
+        REQUIRE(c_strings_match(delimiters.separator,  "," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, " " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     ">" ));
     }
 
     SECTION("Verify wide character delimiters for a std::tuple<...>.")
@@ -199,26 +248,36 @@ TEST_CASE("Delimiter Validation")
         constexpr auto delimiters =
             container_stream_io::decorator::delimiters<std::tuple<int, int>, wchar_t>::values;
 
-        REQUIRE(delimiters.prefix == std::wstring_view{ L"<" });
-        REQUIRE(delimiters.separator == std::wstring_view{ L"," });
-        REQUIRE(delimiters.whitespace == std::wstring_view{ L" " });
-        REQUIRE(delimiters.suffix == std::wstring_view{ L">" });
+        REQUIRE(c_strings_match(delimiters.prefix,     L"<" ));
+        REQUIRE(c_strings_match(delimiters.separator,  L"," ));
+        REQUIRE(c_strings_match(delimiters.whitespace, L" " ));
+        REQUIRE(c_strings_match(delimiters.suffix,     L">" ));
     }
 }
 
 TEST_CASE("Printing of Raw Arrays")
 {
     std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer = std::cout.rdbuf(narrow_buffer.rdbuf());
-    const scope_exit reset_narrow_buffer = [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); };
+    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+#else
+    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
+#endif
 
     std::wstringstream wide_buffer;
-    auto* const old_wide_buffer = std::wcout.rdbuf(wide_buffer.rdbuf());
-    const scope_exit reset_wide_buffer = [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); };
+    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+#else
+    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
+#endif
 
     SECTION("Printing a narrow character array.")
     {
-        const auto& array = "Hello";
+        const auto& array { "Hello" };
         std::cout << array << std::flush;
 
         REQUIRE(narrow_buffer.str() == "Hello");
@@ -226,7 +285,7 @@ TEST_CASE("Printing of Raw Arrays")
 
     SECTION("Printing a wide character array.")
     {
-        const auto& array = L"Hello";
+        const auto& array { L"Hello" };
         std::wcout << array << std::flush;
 
         REQUIRE(wide_buffer.str() == L"Hello");
@@ -249,19 +308,30 @@ TEST_CASE("Printing of Raw Arrays")
     }
 }
 
+
 TEST_CASE("Printing of Standard Library Containers")
 {
     std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer = std::cout.rdbuf(narrow_buffer.rdbuf());
-    const scope_exit reset_narrow_buffer = [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); };
+    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+#else
+    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
+#endif
 
     std::wstringstream wide_buffer;
-    auto* const old_wide_buffer = std::wcout.rdbuf(wide_buffer.rdbuf());
-    const scope_exit reset_wide_buffer = [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); };
+    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+#else
+    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
+#endif
 
     SECTION("Printing a std::pair<...> to a narrow stream.")
     {
-        const auto pair = std::make_pair(10, 100);
+        const auto pair { std::make_pair(10, 100) };
         std::cout << pair << std::flush;
 
         REQUIRE(narrow_buffer.str() == "(10, 100)");
@@ -269,7 +339,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a std::pair<...> to a wide stream.")
     {
-        const auto pair = std::make_pair(10, 100);
+        const auto pair { std::make_pair(10, 100) };
         std::wcout << pair << std::flush;
 
         REQUIRE(wide_buffer.str() == L"(10, 100)");
@@ -285,7 +355,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::vector<...> to a narrow stream.")
     {
-        const std::vector<int> vector{ 1, 2, 3, 4 };
+        const std::vector<int> vector { 1, 2, 3, 4 };
         std::cout << vector << std::flush;
 
         REQUIRE(narrow_buffer.str() == "[1, 2, 3, 4]");
@@ -293,7 +363,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::vector<...> to a wide stream.")
     {
-        const std::vector<int> vector{ 1, 2, 3, 4 };
+        const std::vector<int> vector { 1, 2, 3, 4 };
         std::wcout << vector << std::flush;
 
         REQUIRE(wide_buffer.str() == L"[1, 2, 3, 4]");
@@ -301,7 +371,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing an empty std::set<...> to a narrow stream.")
     {
-        const std::set<int> set{};
+        const std::set<int> set {};
         std::cout << set << std::flush;
 
         REQUIRE(narrow_buffer.str() == "{}");
@@ -309,7 +379,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing an empty std::set<...> to a wide stream.")
     {
-        const std::set<int> set{};
+        const std::set<int> set {};
         std::wcout << set << std::flush;
 
         REQUIRE(wide_buffer.str() == L"{}");
@@ -317,7 +387,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::set<...> to a narrow stream.")
     {
-        const std::set<int> set{ 1, 2, 3, 4 };
+        const std::set<int> set { 1, 2, 3, 4 };
         std::cout << set << std::flush;
 
         REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
@@ -325,7 +395,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::set<...> to a wide stream.")
     {
-        const std::set<int> set{ 1, 2, 3, 4 };
+        const std::set<int> set { 1, 2, 3, 4 };
         std::wcout << set << std::flush;
 
         REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
@@ -333,7 +403,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::multiset<...> to a narrow stream.")
     {
-        const std::multiset<int> multiset{ 1, 2, 3, 4 };
+        const std::multiset<int> multiset { 1, 2, 3, 4 };
         std::cout << multiset << std::flush;
 
         REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
@@ -341,7 +411,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::multiset<...> to a wide stream.")
     {
-        const std::multiset<int> multiset{ 1, 2, 3, 4 };
+        const std::multiset<int> multiset { 1, 2, 3, 4 };
         std::wcout << multiset << std::flush;
 
         REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
@@ -349,7 +419,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing an empty std::tuple<...> to a narrow stream.")
     {
-        const auto tuple = std::make_tuple();
+        const auto tuple { std::make_tuple() };
         std::cout << tuple << std::flush;
 
         REQUIRE(narrow_buffer.str() == "<>");
@@ -357,7 +427,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing an empty std::tuple<...> to a wide stream.")
     {
-        const auto tuple = std::make_tuple();
+        const auto tuple { std::make_tuple() };
         std::wcout << tuple << std::flush;
 
         REQUIRE(wide_buffer.str() == L"<>");
@@ -365,7 +435,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::tuple<...> to a narrow stream.")
     {
-        const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
+        const auto tuple { std::make_tuple(1, 2, 3, 4, 5) };
         std::cout << tuple << std::flush;
 
         REQUIRE(narrow_buffer.str() == "<1, 2, 3, 4, 5>");
@@ -373,7 +443,7 @@ TEST_CASE("Printing of Standard Library Containers")
 
     SECTION("Printing a populated std::tuple<...> to a wide stream.")
     {
-        const auto tuple = std::make_tuple(1, 2, 3, 4, 5);
+        const auto tuple { std::make_tuple(1, 2, 3, 4, 5) };
         std::wcout << tuple << std::flush;
 
         REQUIRE(wide_buffer.str() == L"<1, 2, 3, 4, 5>");
@@ -383,17 +453,27 @@ TEST_CASE("Printing of Standard Library Containers")
 TEST_CASE("Printing of Nested Containers")
 {
     std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer = std::cout.rdbuf(narrow_buffer.rdbuf());
-    const scope_exit reset_narrow_buffer = [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); };
+    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+#else
+    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
+#endif
 
     std::wstringstream wide_buffer;
-    auto* const old_wide_buffer = std::wcout.rdbuf(wide_buffer.rdbuf());
-    const scope_exit reset_wide_buffer = [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); };
+    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+#else
+    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
+#endif
 
     SECTION("Printing a populated std::map<...> to a narrow stream.")
     {
-        const auto map =
-            std::map<int, std::string>{ { 1, "Template" }, { 2, "Meta" }, { 3, "Programming" } };
+        const auto map { std::map<int, std::string> {
+                { 1, "Template" }, { 2, "Meta" }, { 3, "Programming" } } };
 
         std::cout << map << std::flush;
 
@@ -402,9 +482,8 @@ TEST_CASE("Printing of Nested Containers")
 
     SECTION("Printing a populated std::map<...> to a wide stream.")
     {
-        const auto map = std::map<int, std::wstring>{ { 1, L"Template" },
-                                                      { 2, L"Meta" },
-                                                      { 3, L"Programming" } };
+        const auto map { std::map<int, std::wstring>{
+                { 1, L"Template" }, { 2, L"Meta" }, { 3, L"Programming" } } };
 
         std::wcout << map << std::flush;
 
@@ -413,9 +492,8 @@ TEST_CASE("Printing of Nested Containers")
 
     SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
     {
-        const auto vector =
-            std::vector<std::tuple<int, double, std::string>>{ std::make_tuple(1, 0.1, "Hello"),
-                                                               std::make_tuple(2, 0.2, "World") };
+        const auto vector { std::vector<std::tuple<int, double, std::string>>{
+                std::make_tuple(1, 0.1, "Hello"), std::make_tuple(2, 0.2, "World") } };
 
         std::cout << vector << std::flush;
 
@@ -424,9 +502,8 @@ TEST_CASE("Printing of Nested Containers")
 
     SECTION("Printing a populated std::vector<std::tuple<...>> to a wide stream.")
     {
-        const auto vector =
-            std::vector<std::tuple<int, double, std::wstring>>{ std::make_tuple(1, 0.1, L"Hello"),
-                                                                std::make_tuple(2, 0.2, L"World") };
+        const auto vector { std::vector<std::tuple<int, double, std::wstring>>{
+                std::make_tuple(1, 0.1, L"Hello"), std::make_tuple(2, 0.2, L"World") } };
 
         std::wcout << vector << std::flush;
 
@@ -435,9 +512,9 @@ TEST_CASE("Printing of Nested Containers")
 
     SECTION("Printing a populated std::pair<int, std::vector<std::pair<std::string, std::string>>>")
     {
-        const auto pair = std::make_pair(
-            10, std::vector<std::pair<std::string, std::string>>{
-                    std::make_pair("Why", "Not?"), std::make_pair("Someone", "Might!") });
+        const auto pair { std::make_pair(
+                10, std::vector<std::pair<std::string, std::string>> {
+                    std::make_pair("Why", "Not?"), std::make_pair("Someone", "Might!") }) };
 
         std::cout << pair << std::flush;
 
@@ -448,16 +525,26 @@ TEST_CASE("Printing of Nested Containers")
 TEST_CASE("Printing with Custom Formatters")
 {
     std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer = std::cout.rdbuf(narrow_buffer.rdbuf());
-    const scope_exit reset_narrow_buffer = [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); };
+    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+#else
+    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
+    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
+#endif
 
     std::wstringstream wide_buffer;
-    auto* const old_wide_buffer = std::wcout.rdbuf(wide_buffer.rdbuf());
-    const scope_exit reset_wide_buffer = [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); };
+    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
+#if __cplusplus >= 201703L
+    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+#else
+    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
+    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
+#endif
 
     SECTION("Printing a populated std::vector<...> to a wide stream.")
     {
-        const auto container = std::vector<int>{ 1, 2, 3, 4 };
+        const auto container { std::vector<int>{ 1, 2, 3, 4 } };
         container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
         REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
@@ -465,7 +552,7 @@ TEST_CASE("Printing with Custom Formatters")
 
     SECTION("Printing a populated std::tuple<...> to a wide stream.")
     {
-        const auto container = std::make_tuple(1, 2, 3, 4);
+        const auto container { std::make_tuple(1, 2, 3, 4) };
         container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
         REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
@@ -473,7 +560,7 @@ TEST_CASE("Printing with Custom Formatters")
 
     SECTION("Printing a populated std::pair<...> to a wide stream.")
     {
-        const auto container = std::make_pair(1, 2);
+        const auto container { std::make_pair(1, 2) };
         container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
 
         REQUIRE(wide_buffer.str() == L"$$ 1 | 2 $$");
