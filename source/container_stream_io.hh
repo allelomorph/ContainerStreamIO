@@ -60,13 +60,16 @@ template <typename Type, typename = void>
 struct is_parseable_as_container : public std::false_type
 {};
 
-// std::array, std::vector, std::deque
+// !!! unlike the generic version of is_printable_as_container, this generic
+//   does not include std::array, which lacks clear()
+// std::vector, std::deque
 // std::forward_list, std::list
 // std::(unordered_)(multi)set, std::(unordered_)(multi)map
 // not std::stack, std::queue, std::priority_queue (have value_type, but not clear())
 /**
- * @brief Specialization to ensure that Standard Library compatible containers that have
- * members `value_type` and `clear()`, plus  functions are treated as parseable containers.
+ * @brief Specialization to ensure that Standard Library compatible containers that are
+ * move constructible and have members `value_type` and `clear()` are treated as
+ * parseable containers.
  */
 template <typename Type>
 struct is_parseable_as_container<
@@ -91,7 +94,14 @@ struct is_parseable_as_container<std::tuple<Args...>> : public std::true_type
 {};
 
 /**
- * @brief Specialization to treat arrays as parseable container types.
+ * @brief Specialization to treat STL arrays as parseable container types.
+ */
+template <typename ArrayType, std::size_t ArraySize>
+struct is_parseable_as_container<std::array<ArrayType, ArraySize>> : public std::true_type
+{};
+
+/**
+ * @brief Specialization to treat C arrays as parseable container types.
  */
 template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
