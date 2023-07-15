@@ -6,11 +6,16 @@
 #include <set>
 #include <string>
 #include <tuple>
+#include <forward_list>
 #include <utility>
 
 #include <iomanip>   // setfill, setw
 // #include <iterator>  // begin, end
 // #include <type_traits>  // true_type, false_type
+
+#include <unordered_map> // test
+#include <map> //test
+#include "TypeName.hh" // test
 
 #if (__cplusplus < 201103L)
 #error "container_stream_io only supports C++11 and above"
@@ -249,14 +254,19 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace
     : public std::true_type
 {};
 
+/*
 template <typename Type, typename = void>
 struct has_emplace_after : public std::false_type
 {};
 
 template <typename Type>
-struct has_emplace_after<Type, std::void_t<decltype(std::declval<Type&>().emplace_after())>>
+struct has_emplace_after<
+    Type, std::void_t<decltype(std::declval<Type&>().emplace_after(
+                                   std::declval<Type&>().before_begin(),
+                                   std::declval<typename Type::value_type&>() ) ) > >
     : public std::true_type
 {};
+*/
 
 } // namespace traits
 
@@ -688,6 +698,7 @@ inline auto literal(
 
 namespace input {
 
+// TBD move inside default_formatter?
 template <typename CharacterType>
 static void extract_token(
     std::basic_istream<CharacterType>& istream, const CharacterType* token) {
@@ -818,39 +829,6 @@ struct default_formatter
     }
 
 #endif
-    // std::forward_list
-    template <typename ElementType>
-    static auto insert_element(
-        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            container_stream_io::traits::has_emplace_after<ContainerType>::value &&
-            std::is_move_assignable<ElementType>::value, void>
-    {
-        container.emplace_after(container.end(), element);
-    }
-
-    // std::vector, std::deque, std::list
-    template<typename ElementType>
-    static auto insert_element(
-        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            container_stream_io::traits::has_emplace_back<ContainerType>::value &&
-            std::is_move_assignable<ElementType>::value, void>
-    {
-        container.emplace_back(element);
-    }
-
-    // std::(unordered_)set (redundant keys ignored)
-    // std::(unordered_)map (redundant keys will have value of first appearance in serialization)
-    // std::(unordered_)multiset, std::(unordered_)multimap
-    template <typename ElementType>
-    static auto insert_element(
-        ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-            container_stream_io::traits::has_emplace<ContainerType>::value &&
-            !container_stream_io::traits::has_emplace_back<ContainerType>::value &&
-            std::is_move_assignable<ElementType>::value, void>
-    {
-        container.emplace(element);
-    }
-
     static void parse_separator(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.separator);
@@ -862,6 +840,70 @@ struct default_formatter
     }
 };
 
+// TBD is_move_assignable may be redundant here if is_parseable_as_container tests most STL
+//   containers for is_move_constructible
+// std::forward_list
+// !!! constructs list in reverse, may instead need forward_list overload of from_stream
+template <typename ElementType>
+static auto emplace_element(
+    std::forward_list<ElementType>& container, const ElementType& element) noexcept ->
+    std::enable_if_t<std::is_move_assignable<ElementType>::value, void>
+{
+    container.emplace_after(container.before_begin(), element);
+}
+
+// std::vector, std::deque, std::list
+template<typename ContainerType, typename ElementType>
+static auto emplace_element(
+    ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
+        container_stream_io::traits::has_emplace_back<ContainerType>::value &&
+        std::is_move_assignable<ElementType>::value, void>
+{
+    container.emplace_back(element);
+}
+
+// need this overload due to const keys making set/map pairs non-move-assignable
+// std::(unordered_)set (redundant keys ignored)
+// std::(unordered_)map (redundant keys will have value of first appearance in serialization)
+// std::(unordered_)multiset, std::(unordered_)multimap
+template <typename ContainerType, typename KeyType, typename ValueType>
+static auto emplace_element(
+    ContainerType& container,
+    const std::pair<const KeyType, ValueType>& element) noexcept -> std::enable_if_t<
+        container_stream_io::traits::has_emplace<ContainerType>::value, void>
+{
+    container.emplace(element.first, element.second);
+}
+
+
+// !!! now this is generic
+template <typename ContainerType, typename ElementType>
+static auto emplace_element(
+    ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
+        container_stream_io::traits::has_emplace<ContainerType>::value &&
+        !container_stream_io::traits::has_emplace_back<ContainerType>::value &&
+        std::is_move_assignable<ElementType>::value, void>
+{
+    container.emplace(element);
+}
+
+/*template <typename ContainerType, typename ElementType>
+static void emplace_element(
+    ContainerType& container, const ElementType& element) noexcept
+{
+    std::cout << "default emplace_element overload:\n    container: " << TypeName(container) << '\n';
+    std::cout << "    element: " << TypeName(element) << '\n';
+    std::cout << "    has_emplace: " <<
+        container_stream_io::traits::has_emplace<ContainerType>::value << '\n';
+    std::cout << "    has_emplace_back: " <<
+        container_stream_io::traits::has_emplace_back<ContainerType>::value << '\n';
+    std::cout << "    has_emplace_after: " <<
+        container_stream_io::traits::has_emplace_after<ContainerType>::value << '\n';
+    std::cout << "    is_move_assignable: " <<
+        std::is_move_assignable<ElementType>::value << "\n\n";
+}
+*/
+
 // move-assignable (all STL containers (including std::array))
 template<typename ContainerType>
 static auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
@@ -869,6 +911,16 @@ static auto safer_assign(ContainerType& source, ContainerType& target) -> std::e
 {
     target = std::move(source);
 }
+
+/*
+template<typename ContainerType>
+void safer_assign(ContainerType& source, ContainerType& *target*)
+{
+    std::cout << "default safer_assign overload:\n    source/target: " << TypeName(source) << '\n';
+    std::cout << "    is_move_assignable: " <<
+        std::is_move_assignable<ContainerType>::value << "\n\n";
+}
+*/
 
 template<typename ElementType, std::size_t ArraySize>
 static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
@@ -882,6 +934,7 @@ static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)
         safer_assign(*s_it, *t_it);
     }
 }
+
 
 // tried enable_if with SFINAE struct is_array which would be true for std::array
 //   and C arrays, but it appeared that the resolution of is_array caused the
@@ -1025,7 +1078,10 @@ static StreamType& from_stream(
     if (!istream.good())
         return istream;
 
-    FirstType first;
+    // pairs are commonly encounted as key-value members of (unordered_)(multi)maps,
+    //   in which case keys are const regardless of key type named in map instantiation
+    using BaseFirstType = typename std::remove_const<FirstType>::type;
+    BaseFirstType first;
     SecondType second;
 
     formatter.parse_element(istream, first);
@@ -1044,7 +1100,7 @@ static StreamType& from_stream(
     if (istream.bad() || istream.fail())
         return istream;
 
-    safer_assign(first, container.first);
+    safer_assign(first, const_cast<BaseFirstType&>(container.first));
     safer_assign(second, container.second);
 
     return istream;
@@ -1077,7 +1133,7 @@ static StreamType& from_stream(
     formatter.parse_element(istream, temp_elem);
     if (!istream.good())
         return istream;
-    formatter.insert_element(new_container, temp_elem);
+    emplace_element(new_container, temp_elem);
 
     while (!istream.eof()) {
         // parse suffix first to detect end of serialization
@@ -1096,7 +1152,7 @@ static StreamType& from_stream(
         formatter.parse_element(istream, temp_elem);
         if (!istream.good())
             return istream;
-        formatter.insert_element(new_container, temp_elem);
+        emplace_element(new_container, temp_elem);
     }
 
     if (!istream.fail() && !istream.bad())
