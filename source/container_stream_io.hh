@@ -842,16 +842,6 @@ struct default_formatter
 
 // TBD is_move_assignable may be redundant here if is_parseable_as_container tests most STL
 //   containers for is_move_constructible
-// std::forward_list
-// !!! constructs list in reverse, may instead need forward_list overload of from_stream
-template <typename ElementType>
-static auto emplace_element(
-    std::forward_list<ElementType>& container, const ElementType& element) noexcept ->
-    std::enable_if_t<std::is_move_assignable<ElementType>::value, void>
-{
-    container.emplace_after(container.before_begin(), element);
-}
-
 // std::vector, std::deque, std::list
 template<typename ContainerType, typename ElementType>
 static auto emplace_element(
@@ -875,8 +865,7 @@ static auto emplace_element(
     container.emplace(element.first, element.second);
 }
 
-
-// !!! now this is generic
+// !!? now this is the intended generic
 template <typename ContainerType, typename ElementType>
 static auto emplace_element(
     ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
@@ -1103,6 +1092,65 @@ static StreamType& from_stream(
     safer_assign(first, const_cast<BaseFirstType&>(container.first));
     safer_assign(second, container.second);
 
+    return istream;
+}
+
+// std::forward_list requires unique overload due to only having emplace_after,
+//   and no easy way to get iterator to last element (end(), but no --it,)
+//   plus its iterators not being affeced by new emplacements
+template <typename StreamType, typename ElementType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, std::forward_list<ElementType>& container,
+    const FormatterType& formatter)
+{
+    formatter.parse_prefix(istream);
+    if (!istream.good())
+        return istream;
+
+    std::forward_list<ElementType> new_container;
+    ElementType temp_elem;
+
+    // parse suffix to check for empty container
+    formatter.parse_suffix(istream);
+    if (!istream.bad()) {
+        if (!istream.fail()) {
+            container.clear();
+            return istream;
+        } else {
+            istream.clear();
+        }
+    }
+
+    auto nc_it { new_container.before_begin() };
+    formatter.parse_element(istream, temp_elem);
+    if (!istream.good())
+        return istream;
+    new_container.emplace_after(nc_it, temp_elem);
+    ++nc_it;
+
+    while (!istream.eof()) {
+        // parse suffix first to detect end of serialization
+        formatter.parse_suffix(istream);
+        if (!istream.bad()) {
+            if (!istream.fail())
+                break;
+            else
+                istream.clear();
+        }
+
+        formatter.parse_separator(istream);
+        if (!istream.good())
+            return istream;
+
+        formatter.parse_element(istream, temp_elem);
+        if (!istream.good())
+            return istream;
+        new_container.emplace_after(nc_it, temp_elem);
+        ++nc_it;
+    }
+
+    if (!istream.fail() && !istream.bad())
+        container = std::move(new_container);
     return istream;
 }
 
