@@ -13,10 +13,6 @@
 // #include <iterator>  // begin, end
 // #include <type_traits>  // true_type, false_type
 
-#include <unordered_map> // test
-#include <map> //test
-#include "TypeName.hh" // test
-
 #if (__cplusplus < 201103L)
 #error "container_stream_io only supports C++11 and above"
 #endif  // pre-C++11
@@ -67,6 +63,8 @@ struct is_parseable_as_container : public std::false_type
 
 // !!! unlike the generic version of is_printable_as_container, this generic
 //   does not include std::array, which lacks clear()
+// TBD if we can commit to move-assigning a new container into the extraction target,
+//   clear() may not be totally necessary
 // std::vector, std::deque
 // std::forward_list, std::list
 // std::(unordered_)(multi)set, std::(unordered_)(multi)map
@@ -113,28 +111,31 @@ struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
 {};
 
 /**
- * @brief Narrow character array specialization meant to ensure that we print character arrays
- * as strings and not as delimiter containers of individual characters.
+ * @brief Narrow character array specialization meant to ensure that we print
+ * character arrays as strings and not as delimiter containers of individual
+ * characters.
  */
 template <std::size_t ArraySize>
 struct is_parseable_as_container<char[ArraySize]> : public std::false_type
 {};
 
 /**
- * @brief Wide character array specialization meant to ensure that we print character arrays
- * as strings and not as delimiter containers of individual characters.
+ * @brief Wide character array specialization meant to ensure that we print
+ * character arrays as strings and not as delimiter containers of individual
+ * characters.
  */
 template <std::size_t ArraySize>
 struct is_parseable_as_container<wchar_t[ArraySize]> : public std::false_type
 {};
 
 /**
- * @brief String specialization meant to ensure that we treat strings as nothing more than
- * strings.
+ * @brief String specialization meant to ensure that we treat strings as nothing
+ * more than strings.
  */
 template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
 struct is_parseable_as_container<
-    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
+    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>>
+    : public std::false_type
 {};
 
 #ifdef __cpp_variable_templates
@@ -153,14 +154,16 @@ struct is_printable_as_container : public std::false_type
 {};
 
 /**
- * @brief Specialization to ensure that Standard Library compatible containers that have
- * `begin()`, `end()`, and `empty()` member functions are treated as printable containers.
+ * @brief Specialization to ensure that Standard Library compatible containers
+ * that have begin(), end(), and empty() member functions are treated as
+ * printable containers.
  */
 template <typename Type>
 struct is_printable_as_container<
-    Type, std::void_t<
-              typename Type::iterator, decltype(std::declval<Type&>().begin()),
-              decltype(std::declval<Type&>().end()), decltype(std::declval<Type&>().empty())>>
+    Type, std::void_t<typename Type::iterator,
+                      decltype(std::declval<Type&>().begin()),
+                      decltype(std::declval<Type&>().end()),
+                      decltype(std::declval<Type&>().empty())>>
     : public std::true_type
 {};
 
@@ -186,28 +189,31 @@ struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
 {};
 
 /**
- * @brief Narrow character array specialization meant to ensure that we print character arrays
- * as strings and not as delimiter containers of individual characters.
+ * @brief Narrow character array specialization meant to ensure that we print
+ * character arrays as strings and not as delimiter containers of individual
+ * characters.
  */
 template <std::size_t ArraySize>
 struct is_printable_as_container<char[ArraySize]> : public std::false_type
 {};
 
 /**
- * @brief Wide character array specialization meant to ensure that we print character arrays
- * as strings and not as delimiter containers of individual characters.
+ * @brief Wide character array specialization meant to ensure that we print
+ * character arrays as strings and not as delimiter containers of individual
+ * characters.
  */
 template <std::size_t ArraySize>
 struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
 {};
 
 /**
- * @brief String specialization meant to ensure that we treat strings as nothing more than
- * strings.
+ * @brief String specialization meant to ensure that we treat strings as nothing
+ * more than strings.
  */
 template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
 struct is_printable_as_container<
-    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>> : public std::false_type
+    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>>
+    : public std::false_type
 {};
 
 #ifdef __cpp_variable_templates
@@ -253,20 +259,6 @@ template <typename Type>
 struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
     : public std::true_type
 {};
-
-/*
-template <typename Type, typename = void>
-struct has_emplace_after : public std::false_type
-{};
-
-template <typename Type>
-struct has_emplace_after<
-    Type, std::void_t<decltype(std::declval<Type&>().emplace_after(
-                                   std::declval<Type&>().before_begin(),
-                                   std::declval<typename Type::value_type&>() ) ) > >
-    : public std::true_type
-{};
-*/
 
 } // namespace traits
 
@@ -564,7 +556,8 @@ std::basic_istream<CharacterType, TraitsType>& operator>>(
         }
         if (str.type == repr::literal)
         {
-            // "\?" -> '?' omitted from ascii_escapes as it is only relevant during extraction
+            // '\?' -> '?' omitted from ascii_escapes as it is only relevant
+            //   during istream extraction
             if (c == CharacterType('?'))
             {
                 temp += c;
@@ -698,42 +691,45 @@ inline auto literal(
 
 namespace input {
 
-// TBD move inside default_formatter?
-template <typename CharacterType>
-static void extract_token(
-    std::basic_istream<CharacterType>& istream, const CharacterType* token) {
-    if (token == nullptr) {
-        istream.setstate(std::ios_base::failbit);
-        return;
-    }
-    auto token_s {
-#if (__cplusplus >= 201703L)
-        std::basic_string_view<CharacterType>{token}
-#else
-        std::basic_string<CharacterType>{token}
-#endif
-    };
-    istream >> std::ws;
-    auto it_1 {token_s.begin()};
-    while (!istream.eof() && it_1 != token_s.end() &&
-           CharacterType(istream.peek()) == *it_1) {
-        istream.get();
-        ++it_1;
-    }
-    if (it_1 != token_s.end()) {
-        // only partial delim match, return chars to stream
-        for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
-            istream.putback(*it_2);
-        istream.setstate(std::ios_base::failbit);
-    }
-    return;
-}
-
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, typename StreamType::char_type>::values;
+
+    template <typename CharacterType>
+    static void extract_token(
+        std::basic_istream<CharacterType>& istream, const CharacterType* token)
+    {
+        if (token == nullptr)
+        {
+            istream.setstate(std::ios_base::failbit);
+            return;
+        }
+        auto token_s {
+#if (__cplusplus >= 201703L)
+            std::basic_string_view<CharacterType> { token }
+#else
+            std::basic_string<CharacterType> { token }
+#endif
+        };
+        istream >> std::ws;
+        auto it_1 { token_s.begin() };
+        while (!istream.eof() && it_1 != token_s.end() &&
+               CharacterType(istream.peek()) == *it_1)
+        {
+            istream.get();
+            ++it_1;
+        }
+        if (it_1 != token_s.end())
+        {
+            // only partial token match, return chars to stream
+            for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
+                istream.putback(*it_2);
+            istream.setstate(std::ios_base::failbit);
+        }
+        return;
+    }
 
     static void parse_prefix(StreamType& istream) noexcept
     {
@@ -774,7 +770,8 @@ struct default_formatter
     }
 
     template <typename CharacterType, std::size_t ArraySize>
-    static void parse_char_array(StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
+    static void parse_char_array(
+        StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
     {
         std::basic_string<CharacterType> s;
         using repr = strings::detail::repr;
@@ -792,20 +789,22 @@ struct default_formatter
     }
 
     template <std::size_t ArraySize>
-    static void parse_element(StreamType& istream, char (&element)[ArraySize]) noexcept
+    static void parse_element(
+        StreamType& istream, char (&element)[ArraySize]) noexcept
     {
         parse_char_array<char, ArraySize>(istream, element);
     }
 
     template <std::size_t ArraySize>
-    static void parse_element(StreamType& istream, wchar_t (&element)[ArraySize]) noexcept
+    static void parse_element(
+        StreamType& istream, wchar_t (&element)[ArraySize]) noexcept
     {
         parse_char_array<char, ArraySize>(istream, element);
     }
 
     template<typename CharacterType>
-    static void parse_element(StreamType& istream,
-                              std::basic_string<CharacterType>& element) noexcept
+    static void parse_element(
+        StreamType& istream, std::basic_string<CharacterType>& element) noexcept
     {
         using repr = strings::detail::repr;
         if ((repr)istream.iword(strings::detail::get_manip_i()) == repr::quoted)
@@ -816,8 +815,8 @@ struct default_formatter
 
 #if (__cplusplus >= 201703L)
     template<typename CharacterType>
-    static void parse_element(StreamType& istream,
-                              std::basic_string_view<CharacterType>& element) noexcept
+    static void parse_element(
+        StreamType& istream, std::basic_string_view<CharacterType>& element) noexcept
     {
         std::basic_string<CharacterType> s;
         using repr = strings::detail::repr;
@@ -876,23 +875,6 @@ static auto emplace_element(
     container.emplace(element);
 }
 
-/*template <typename ContainerType, typename ElementType>
-static void emplace_element(
-    ContainerType& container, const ElementType& element) noexcept
-{
-    std::cout << "default emplace_element overload:\n    container: " << TypeName(container) << '\n';
-    std::cout << "    element: " << TypeName(element) << '\n';
-    std::cout << "    has_emplace: " <<
-        container_stream_io::traits::has_emplace<ContainerType>::value << '\n';
-    std::cout << "    has_emplace_back: " <<
-        container_stream_io::traits::has_emplace_back<ContainerType>::value << '\n';
-    std::cout << "    has_emplace_after: " <<
-        container_stream_io::traits::has_emplace_after<ContainerType>::value << '\n';
-    std::cout << "    is_move_assignable: " <<
-        std::is_move_assignable<ElementType>::value << "\n\n";
-}
-*/
-
 // move-assignable (all STL containers (including std::array))
 template<typename ContainerType>
 static auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
@@ -901,21 +883,9 @@ static auto safer_assign(ContainerType& source, ContainerType& target) -> std::e
     target = std::move(source);
 }
 
-/*
-template<typename ContainerType>
-void safer_assign(ContainerType& source, ContainerType& *target*)
-{
-    std::cout << "default safer_assign overload:\n    source/target: " << TypeName(source) << '\n';
-    std::cout << "    is_move_assignable: " <<
-        std::is_move_assignable<ContainerType>::value << "\n\n";
-}
-*/
-
 template<typename ElementType, std::size_t ArraySize>
 static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
 {
-    // TBD: optimize with C memcpy?
-    // memcpy(&target[0], &source[0], ArraySize * sizeof ElementType);
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
          t_it != t_end; ++s_it, ++t_it)
@@ -998,8 +968,8 @@ template <typename TupleType, std::size_t Index, std::size_t Last>
 struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
-    static void
-    parse(StreamType& istream, TupleType& container, const FormatterType& formatter)
+    static void parse(
+        StreamType& istream, TupleType& container, const FormatterType& formatter)
     {
         istream >> std::get<Index>(container);
         formatter.parse_separator(istream);
@@ -1016,8 +986,8 @@ template <typename TupleType, std::size_t Index>
 struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
-    static void
-    parse(StreamType& istream, TupleType& tuple, const FormatterType& formatter) noexcept
+    static void parse(
+        StreamType& istream, TupleType& tuple, const FormatterType& formatter) noexcept
     {
         if (istream.good())
             formatter.parse_element(istream, std::get<Index>(tuple));
@@ -1057,6 +1027,7 @@ static StreamType& from_stream(
     return istream;
 }
 
+// std::pairs, including set/map members
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -1154,6 +1125,7 @@ static StreamType& from_stream(
     return istream;
 }
 
+// TBD use of clear could be avoided with container = ContainerType{}
 // "generic" overload, but requires value_type, clear(), move assignment of container and elements
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -1315,8 +1287,8 @@ template <typename TupleType, std::size_t Index, std::size_t Last>
 struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& ostream, const TupleType& container, const FormatterType& formatter)
+    static void print(
+        StreamType& ostream, const TupleType& container, const FormatterType& formatter)
     {
         ostream << std::get<Index>(container);
         formatter.print_separator(ostream);
@@ -1332,8 +1304,8 @@ template <typename TupleType, std::size_t Index>
 struct tuple_handler<TupleType, Index, Index>
 {
     template <typename StreamType, typename FormatterType>
-    static void
-    print(StreamType& ostream, const TupleType& tuple, const FormatterType& formatter) noexcept
+    static void print(
+        StreamType& ostream, const TupleType& tuple, const FormatterType& formatter) noexcept
     {
         formatter.print_element(ostream, std::get<Index>(tuple));
     }
