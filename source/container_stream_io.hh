@@ -834,7 +834,7 @@ struct default_formatter
     {
         std::basic_string<CharacterType> s;
         if (static_cast<repr_type>(
-                istream.iword(strings::detail::get_manip_i()) == repr_type::quoted)
+                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
             istream >> std::ws >> strings::quoted(s);
         else
             istream >> std::ws >> strings::literal(s);
