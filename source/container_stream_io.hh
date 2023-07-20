@@ -262,124 +262,6 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace
 
 } // namespace traits
 
-namespace decorator {
-
-/**
- * @brief Struct to neatly wrap up all the additional characters we'll need in order to
- * print out the containers.
- */
-template <typename CharacterType>
-struct delim_wrapper
-{
-    const CharacterType* prefix;
-    const CharacterType* separator;
-    const CharacterType* whitespace;
-    const CharacterType* suffix;
-};
-
-/**
- * @brief Base definition for the delimiters. This probably won't ever get invoked.
- */
-template <typename /*ContainerType*/, typename CharacterType>
-struct delimiters
-{
-    static const delim_wrapper<CharacterType> values;
-};
-
-/**
- * @brief Default narrow character specialization for any container type that isn't even
- * more specialized.
- */
-template <typename ContainerType>
-struct delimiters<ContainerType, char>
-{
-    static constexpr delim_wrapper<char> values { "[", ",", " ", "]" };
-};
-
-/**
- * @brief Default wide character specialization for any container type that isn't even
- * more specialized.
- */
-template <typename ContainerType>
-struct delimiters<ContainerType, wchar_t>
-{
-    static constexpr delim_wrapper<wchar_t> values { L"[", L",", L" ", L"]" };
-};
-
-/**
- * @brief Narrow character specialization for std::set<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType>
-struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
-{
-    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
-};
-
-/**
- * @brief Wide character specialization for std::set<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType>
-struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
-{
-    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
-};
-
-/**
- * @brief Narrow character specialization for std::multiset<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType>
-struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
-{
-    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
-};
-
-/**
- * @brief Wide character specialization for std::multiset<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType>
-struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
-{
-    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
-};
-
-/**
- * @brief Narrow character specialization for std::pair<...> instances.
- */
-template <typename FirstType, typename SecondType>
-struct delimiters<std::pair<FirstType, SecondType>, char>
-{
-    static constexpr delim_wrapper<char> values { "(", ",", " ", ")" };
-};
-
-/**
- * @brief Wide character specialization for std::pair<...> instances.
- */
-template <typename FirstType, typename SecondType>
-struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
-{
-    static constexpr delim_wrapper<wchar_t> values { L"(", L",", L" ", L")" };
-};
-
-/**
- * @brief Narrow character specialization for std::tuple<...> instances.
- */
-template <typename... DataType>
-struct delimiters<std::tuple<DataType...>, char>
-{
-    static constexpr delim_wrapper<char> values { "<", ",", " ", ">" };
-};
-
-/**
- * @brief Wide character specialization for std::tuple<...> instances.
- */
-template <typename... DataType>
-struct delimiters<std::tuple<DataType...>, wchar_t>
-{
-    static constexpr delim_wrapper<wchar_t> values { L"<", L",", L" ", L">" };
-};
-
-} // namespace decorator
-
 namespace strings {
 
 namespace detail {
@@ -701,6 +583,123 @@ inline auto literal(
 
 }  // namespace strings
 
+namespace decorator {
+
+/**
+ * @brief Struct to neatly wrap up all the additional characters we'll need in order to
+ * print out the containers.
+ */
+template <typename CharacterType>
+struct delim_wrapper
+{
+    const CharacterType* prefix;
+    const CharacterType* separator;
+    const CharacterType* whitespace;
+    const CharacterType* suffix;
+};
+
+/**
+ * @brief Base definition for the delimiters. This probably won't ever get invoked.
+ */
+template <typename /*ContainerType*/, typename CharacterType>
+struct delimiters
+{
+    static const delim_wrapper<CharacterType> values;
+};
+
+/**
+ * @brief Default narrow character specialization for any container type that isn't even
+ * more specialized.
+ */
+template <typename ContainerType>
+struct delimiters<ContainerType, char>
+{
+    static constexpr delim_wrapper<char> values { "[", ",", " ", "]" };
+};
+
+/**
+ * @brief Default wide character specialization for any container type that isn't even
+ * more specialized.
+ */
+template <typename ContainerType>
+struct delimiters<ContainerType, wchar_t>
+{
+    static constexpr delim_wrapper<wchar_t> values { L"[", L",", L" ", L"]" };
+};
+
+/**
+ * @brief Narrow character specialization for std::set<...> instances.
+ */
+template <typename DataType, typename ComparatorType, typename AllocatorType>
+struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, char>
+{
+    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
+};
+
+/**
+ * @brief Wide character specialization for std::set<...> instances.
+ */
+template <typename DataType, typename ComparatorType, typename AllocatorType>
+struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, wchar_t>
+{
+    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
+};
+
+/**
+ * @brief Narrow character specialization for std::multiset<...> instances.
+ */
+template <typename DataType, typename ComparatorType, typename AllocatorType>
+struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, char>
+{
+    static constexpr delim_wrapper<char> values { "{", ",", " ", "}" };
+};
+
+/**
+ * @brief Wide character specialization for std::multiset<...> instances.
+ */
+template <typename DataType, typename ComparatorType, typename AllocatorType>
+struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, wchar_t>
+{
+    static constexpr delim_wrapper<wchar_t> values { L"{", L",", L" ", L"}" };
+};
+
+/**
+ * @brief Narrow character specialization for std::pair<...> instances.
+ */
+template <typename FirstType, typename SecondType>
+struct delimiters<std::pair<FirstType, SecondType>, char>
+{
+    static constexpr delim_wrapper<char> values { "(", ",", " ", ")" };
+};
+
+/**
+ * @brief Wide character specialization for std::pair<...> instances.
+ */
+template <typename FirstType, typename SecondType>
+struct delimiters<std::pair<FirstType, SecondType>, wchar_t>
+{
+    static constexpr delim_wrapper<wchar_t> values { L"(", L",", L" ", L")" };
+};
+
+/**
+ * @brief Narrow character specialization for std::tuple<...> instances.
+ */
+template <typename... DataType>
+struct delimiters<std::tuple<DataType...>, char>
+{
+    static constexpr delim_wrapper<char> values { "<", ",", " ", ">" };
+};
+
+/**
+ * @brief Wide character specialization for std::tuple<...> instances.
+ */
+template <typename... DataType>
+struct delimiters<std::tuple<DataType...>, wchar_t>
+{
+    static constexpr delim_wrapper<wchar_t> values { L"<", L",", L" ", L">" };
+};
+
+} // namespace decorator
 
 namespace input {
 
