@@ -264,6 +264,181 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace
 
 namespace strings {
 
+namespace compile_time {
+
+// functions to convert ascii string literals in source to appropriate char type,
+//   adapted from:
+//   - https://stackoverflow.com/a/60770220
+
+#if (__cplusplus >= 201703L)
+
+template<typename CharType>
+constexpr const CharType char_literal(
+    [[maybe_unused]] const char ac,
+    [[maybe_unused]] const wchar_t wc,
+#if (__cplusplus > 201703L)
+    [[maybe_unused]] const char8_t u8c,
+#endif
+    [[maybe_unused]] const char16_t u16c,
+    [[maybe_unused]] const char32_t u32c)
+{
+    if      constexpr( std::is_same_v<CharType, char> )      return ac;
+    else if constexpr( std::is_same_v<CharType, wchar_t> )   return wc;
+#if (__cplusplus > 201703L)
+    else if constexpr( std::is_same_v<CharType, char8_t> )   return u8c;
+#endif
+    else if constexpr( std::is_same_v<CharType, char16_t> )  return u16c;
+    else if constexpr( std::is_same_v<CharType, char32_t> )  return u32c;
+}
+
+template<typename CharType,
+         std::size_t SizeAscii, std::size_t SizeWide,
+#if (__cplusplus > 201703L)
+         std::size_t SizeUTF8,
+#endif
+         std::size_t SizeUTF16, std::size_t SizeUTF32,
+         std::size_t Size = (
+         std::is_same_v<CharType, char>     ? SizeAscii :
+         std::is_same_v<CharType, wchar_t>  ? SizeWide  :
+#if (__cplusplus > 201703L)
+         std::is_same_v<CharType, char8_t>  ? SizeUTF8  :
+#endif
+         std::is_same_v<CharType, char16_t> ? SizeUTF16 :
+         std::is_same_v<CharType, char32_t> ? SizeUTF32 : 0 ) >
+constexpr auto string_literal(
+    [[maybe_unused]] const char (&as) [SizeAscii],
+    [[maybe_unused]] const wchar_t (&ws) [SizeWide],
+#if (__cplusplus > 201703L)
+    [[maybe_unused]] const char8_t (&u8s) [SizeUTF8],
+#endif
+    [[maybe_unused]] const char16_t (&u16s) [SizeUTF16],
+    [[maybe_unused]] const char32_t (&u32s) [SizeUTF32]
+        ) -> const CharType(&)[Size]
+{
+    if      constexpr( std::is_same_v<CharType, char> )     return as;
+    else if constexpr( std::is_same_v<CharType, wchar_t> )  return ws;
+#if (__cplusplus > 201703L)
+    else if constexpr( std::is_same_v<CharType, char8_t> )  return u8s;
+#endif
+    else if constexpr( std::is_same_v<CharType, char16_t> ) return u16s;
+    else if constexpr( std::is_same_v<CharType, char32_t> ) return u32s;
+}
+
+#else // __cplusplus < 201703L
+
+// full template specialization appropriate
+template<typename CharType>
+constexpr CharType char_literal(
+    const char ac, const wchar_t wc, const char16_t u16c, const char32_t u32c);
+
+template<>
+constexpr char char_literal(
+    const char ac, const wchar_t /*wc*/, const char16_t /*u16c*/, const char32_t /*u32c*/)
+{
+    return ac;
+}
+
+template<>
+constexpr wchar_t char_literal(
+    const char /*ac*/, const wchar_t wc, const char16_t /*u16c*/, const char32_t /*u32c*/)
+{
+    return wc;
+}
+
+template<>
+constexpr char16_t char_literal(
+    const char /*ac*/, const wchar_t /*wc*/, const char16_t u16c, const char32_t /*u32c*/)
+{
+    return u16c;
+}
+
+template<>
+constexpr char32_t char_literal(
+    const char /*ac*/, const wchar_t /*wc*/, const char16_t /*u16c*/, const char32_t u32c)
+{
+    return u32c;
+}
+
+// partial function template specialization not allowed by standard, see:
+//   - https://stackoverflow.com/a/21218271
+//   so instead using overloads each templated by literal sizes and enabled by
+//   return char type,
+template<typename CharType,
+         std::size_t SizeAscii, std::size_t SizeWide,
+         std::size_t SizeUTF16, std::size_t SizeUTF32>
+constexpr auto string_literal(
+    const char (&as)[SizeAscii], const wchar_t (&/*ws*/)[SizeWide],
+    const char16_t (&/*u16s*/)[SizeUTF16], const char32_t (&/*u32s*/)[SizeUTF32]
+    ) -> std::enable_if_t<
+        std::is_same<CharType, char>::value,
+        const char(&)[SizeAscii]>
+{
+    return as;
+}
+
+template<typename CharType,
+         std::size_t SizeAscii, std::size_t SizeWide,
+         std::size_t SizeUTF16, std::size_t SizeUTF32>
+constexpr auto string_literal(
+    const char (&/*as*/)[SizeAscii], const wchar_t (&ws)[SizeWide],
+    const char16_t (&/*u16s*/)[SizeUTF16], const char32_t (&/*u32s*/)[SizeUTF32]
+    ) -> std::enable_if_t<
+        std::is_same<CharType, wchar_t>::value,
+        const wchar_t(&)[SizeWide]>
+{
+    return ws;
+}
+
+template<typename CharType,
+         std::size_t SizeAscii, std::size_t SizeWide,
+         std::size_t SizeUTF16, std::size_t SizeUTF32>
+constexpr auto string_literal(
+    const char (&/*as*/)[SizeAscii], const wchar_t (&/*ws*/)[SizeWide],
+    const char16_t (&u16s)[SizeUTF16], const char32_t (&/*u32s*/)[SizeUTF32]
+    ) -> std::enable_if_t<
+        std::is_same<CharType, char16_t>::value,
+        const char16_t(&)[SizeUTF16]>
+{
+    return u16s;
+}
+
+template<typename CharType,
+         std::size_t SizeAscii, std::size_t SizeWide,
+         std::size_t SizeUTF16, std::size_t SizeUTF32>
+constexpr auto string_literal(
+    const char (&/*as*/)[SizeAscii], const wchar_t (&/*ws*/)[SizeWide],
+    const char16_t (&/*u16s*/)[SizeUTF16], const char32_t (&u32s)[SizeUTF32]
+    ) -> std::enable_if_t<
+        std::is_same<CharType, char32_t>::value,
+        const char32_t(&)[SizeUTF32]>
+{
+    return u32s;
+}
+
+#endif
+
+#if (__cplusplus > 201703L)
+
+#define  CHAR_LITERAL(CHAR_T, LITERAL) \
+    char_literal<CHAR_T>( LITERAL, L ## LITERAL, u8 ## LITERAL, \
+                          u ## LITERAL, U ## LITERAL )
+
+#define  STRING_LITERAL(CHAR_T, LITERAL) \
+    string_literal<CHAR_T>( LITERAL, L ## LITERAL, u8 ## LITERAL, \
+                            u ## LITERAL, U ## LITERAL )
+
+#else  // __cplusplus <= 201703L
+
+#define  CHAR_LITERAL(CHAR_T, LITERAL) \
+    char_literal<CHAR_T>( LITERAL, L ## LITERAL, u ## LITERAL, U ## LITERAL )
+
+#define  STRING_LITERAL(CHAR_T, LITERAL) \
+    string_literal<CHAR_T>( LITERAL, L ## LITERAL, u ## LITERAL, U ## LITERAL )
+
+#endif
+
+} // namespace compile_time
+
 namespace detail {
 
 // labels for flag values used to set string representation type
@@ -316,6 +491,7 @@ struct string_repr
 
     repr_type type;
 
+    // !!! use auto here instead of decltype
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
     static constexpr decltype(ascii_escape<CharacterType>::seqs) escape_seqs {
