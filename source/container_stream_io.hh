@@ -1154,12 +1154,14 @@ struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
     static void parse(
-        StreamType& istream, TupleType& container, const FormatterType& formatter)
+        StreamType& istream, TupleType& tuple, const FormatterType& formatter)
     {
-        istream >> std::get<Index>(container);
-        formatter.parse_separator(istream);
         if (istream.good())
-            tuple_handler<TupleType, Index + 1, Last>::parse(istream, container, formatter);
+            formatter.parse_element(istream, std::get<Index>(tuple));
+        if (istream.good())
+            formatter.parse_separator(istream);
+        if (istream.good())
+            tuple_handler<TupleType, Index + 1, Last>::parse(istream, tuple, formatter);
     }
 };
 
@@ -1475,11 +1477,11 @@ struct tuple_handler
 {
     template <typename StreamType, typename FormatterType>
     static void print(
-        StreamType& ostream, const TupleType& container, const FormatterType& formatter)
+        StreamType& ostream, const TupleType& tuple, const FormatterType& formatter)
     {
-        ostream << std::get<Index>(container);
+        formatter.print_element(ostream, std::get<Index>(tuple));
         formatter.print_separator(ostream);
-        tuple_handler<TupleType, Index + 1, Last>::print(ostream, container, formatter);
+        tuple_handler<TupleType, Index + 1, Last>::print(ostream, tuple, formatter);
     }
 };
 
@@ -1516,14 +1518,14 @@ struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& to_stream(
-    StreamType& ostream, const std::tuple<TupleArgs...>& container,
+    StreamType& ostream, const std::tuple<TupleArgs...>& tuple,
     const FormatterType& formatter)
 {
-    using ContainerType = std::decay_t<decltype(container)>;
+    using TupleType = std::decay_t<decltype(tuple)>;
 
     formatter.print_prefix(ostream);
     container_stream_io::output::tuple_handler<
-        ContainerType, 0, sizeof...(TupleArgs) - 1>::print(ostream, container, formatter);
+        TupleType, 0, sizeof...(TupleArgs) - 1>::print(ostream, tuple, formatter);
     formatter.print_suffix(ostream);
 
     return ostream;
