@@ -103,6 +103,7 @@ template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<std::array<ArrayType, ArraySize>> : public std::true_type
 {};
 
+/// TBD C array strings need to also handle uintXX_t cases
 /**
  * @brief Specialization to treat C arrays as parseable container types.
  */
@@ -453,8 +454,9 @@ struct escape_seq
     CharacterType symbol;
 };
 
-// char and wchar_t share the same set of standard escape sequences
-// currently no plans to support unicode
+// given char and wchar_t share the same set of standard escapes, and
+//   Unicode code points below 0x7f map to 7-bit ASCII, escapes treated the
+//   same for all char types
 // wrapping in struct to avoid variable template use for C++11 compliance
 template<typename CharacterType>
 struct ascii_escape
@@ -473,8 +475,11 @@ struct ascii_escape
 };
 
 // quoted/literal implementation (string_repr, operator<</>>(string_repr),
-//   quoted(), literal()) based on glibc C++14 std::quoted, redone here to
-//   add features and allow use in in C++11
+//   quoted(), literal()) based on glibc C++14 std::quoted (as seen in iomanip
+//   and bits/quoted_string.h headers;) redone here to add features and allow
+//   use in C++11
+// ??? string::char_type and CharacterType need not match, as ctor enforces 7-bit
+//   ASCII code points
 /**
  * @brief Struct for string literal representations.
  */
@@ -488,23 +493,24 @@ struct string_repr
     StringType string;
     CharacterType delim;
     CharacterType escape;
-
     repr_type type;
 
-    // !!! use auto here instead of decltype
+    // !!? why does using decltype over auto here prevent the "has no
+    //   initializer" error with the outside declaration?
     // using array instead of map due to small, fixed set of keys, and
     //   need to lookup by both actual and symbol
     static constexpr decltype(ascii_escape<CharacterType>::seqs) escape_seqs {
-        ascii_escape<CharacterType>::seqs};
+        ascii_escape<CharacterType>::seqs };
 
-    string_repr(void) = delete;
-    string_repr(StringType str, CharacterType dlm, CharacterType esc, repr_type t)
+    string_repr() = delete;
+    string_repr(const StringType str, const CharacterType dlm,
+                const CharacterType esc, const repr_type t)
 	: string(str), delim{dlm}, escape{esc}, type{t}
     {
-        // relies on implicit conversion of char to wchar_t in iswprint()
-        if (!std::iswprint(dlm) || !std::iswprint(esc))
+        if (dlm > 0x7f || !std::isprint(dlm) ||
+            esc > 0x7f || !std::isprint(esc))
             throw(std::invalid_argument(
-                      "delim and escape must be printable characters"));
+                      "delim and escape must be printable ASCII characters"));
     }
 
     string_repr& operator=(string_repr&) = delete;
@@ -515,9 +521,11 @@ struct string_repr
 //   - https://en.cppreference.com/w/cpp/language/static
 //   - https://stackoverflow.com/a/28846608
 #if (__cplusplus < 201703L)
+
 template<typename StringType, typename CharacterType>
 constexpr decltype(ascii_escape<CharacterType>::seqs) string_repr<
     StringType, CharacterType>::escape_seqs;
+
 #endif  // pre-C++17
 
 // stream index getter for use with iword/pword to set literalrepr/quotedrepr
@@ -530,49 +538,61 @@ static inline int get_manip_i()
 // !!! hex escape sequences need to scale to size of string char type - note
 //   that size of wchar_t is compiler-specific:
 //   - https://en.wikipedia.org/wiki/Wide_character -> Programming Specifics -> C/C++
-// TBD could free up current limitation that all container member strings/chars
-//   must have same char width as stream by hex escaping all chars wider than
-//   stream char type
+// TBD simplify prototype by only templating stream and string by chartype
 /**
  * @brief Inserter for quoted strings.
  */
-template<typename CharacterType, typename TraitsType, typename AllocatorType>
-std::basic_ostream<CharacterType, TraitsType>& operator<<(
-    std::basic_ostream<CharacterType, TraitsType>& ostream,
-    const string_repr<
-    const std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
+template<typename StreamCharType, typename StreamTraitsType,
+         typename StringCharType, typename StringTraitsType, typename AllocatorType>
+auto operator<<(std::basic_ostream<StreamCharType, StreamTraitsType>& ostream,
+    const string_repr<const std::basic_string<
+                StringCharType, StringTraitsType, AllocatorType>&,
+                StringCharType>& str
+    ) -> std::basic_ostream<StreamCharType, StreamTraitsType>&
 {
-    std::basic_ostringstream<CharacterType, TraitsType> oss;
-    // currently only supporting 2 char types, of those only wchar_t takes a prefix
-    if (std::is_same<CharacterType, wchar_t>::value)
-        oss << CharacterType('L');
+    std::basic_ostringstream<StreamCharType, StreamTraitsType> oss;
+
+    using namespace compile_time;  // char_literal, string_literal
+    if (std::is_same<StreamCharType, wchar_t>::value)
+        oss << CHAR_LITERAL(StreamCharType, 'L');
+#if (__cplusplus > 201703L)
+    if (std::is_same<StreamCharType, char8_t>::value)
+        oss << STRING_LITERAL(StreamCharType, "u8");
+#endif
+    if (std::is_same<StreamCharType, char16_t>::value)
+        oss << CHAR_LITERAL(StreamCharType, 'u');
+    if (std::is_same<StreamCharType, char32_t>::value)
+        oss << CHAR_LITERAL(StreamCharType, 'U');
+
     oss << str.delim;
     for (const auto &c : str.string)
     {
-        // string_repr ctor enforces printable delim and escape
-        // relies on implicit conversion of char to wchar_t in iswprint()
-        if (std::iswprint(c))
+        // 7-bit ASCII code points printed regardless of char width
+        // string_repr ctor enforces ASCII-printable delim and escape
+        if (c <= 0x7f && std::isprint(c))
         {
             if (c == str.delim || c == str.escape)
                 oss << str.escape;
             oss << c;
         }
-        else if (str.type == repr_type::literal)
+        else if (str.type == repr_type::literal ||
+                 !std::is_same<StringCharType, StreamCharType>::value)
         {
             oss << str.escape;
-            auto esc_it {std::find_if(
+            auto esc_it { std::find_if(
                     str.escape_seqs.begin(), str.escape_seqs.end(),
-                    [&c](const escape_seq<CharacterType>& seq){
-                        return seq.actual == c; })};
+                    [&c](const escape_seq<StringCharType>& seq){
+                        return seq.actual == c; }) };
             if (esc_it != str.escape_seqs.end())  // standard escape sequence
             {
-                oss << esc_it->symbol;
+                oss << StreamCharType(esc_it->symbol);
             }
             else  // custom hex escape sequence
             {
-                oss << CharacterType('x') <<
-                    std::hex << std::setfill(CharacterType('0')) << std::setw(2) <<
-                    (0xff & (unsigned int)c);
+                oss << StreamCharType('x') <<
+                    std::hex << std::setfill(StreamCharType('0')) <<
+                    std::setw(2 * sizeof(StringCharType)) <<
+                    static_cast<unsigned int>(c);
             }
         }
     }
@@ -852,14 +872,15 @@ namespace input {
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
-    static constexpr auto decorators = container_stream_io::decorator::delimiters<
-        ContainerType, typename StreamType::char_type>::values;
-
     using repr_type = strings::detail::repr_type;
+    using stream_char_type = typename StreamType::char_type;
 
-    template <typename CharacterType>
+    static constexpr auto decorators = container_stream_io::decorator::delimiters<
+        ContainerType, stream_char_type>::values;
+
+    // attempts extraction of exact token, returns chars to stream on failure
     static void extract_token(
-        std::basic_istream<CharacterType>& istream, const CharacterType* token)
+        StreamType& istream, const stream_char_type* token)
     {
         if (token == nullptr)
         {
@@ -868,15 +889,15 @@ struct default_formatter
         }
         auto token_s {
 #if (__cplusplus >= 201703L)
-            std::basic_string_view<CharacterType> { token }
+            std::basic_string_view<stream_char_type> { token }
 #else
-            std::basic_string<CharacterType> { token }
+            std::basic_string<stream_char_type> { token }
 #endif
         };
         istream >> std::ws;
         auto it_1 { token_s.begin() };
         while (!istream.eof() && it_1 != token_s.end() &&
-               CharacterType(istream.peek()) == *it_1)
+               stream_char_type(istream.peek()) == *it_1)
         {
             istream.get();
             ++it_1;
@@ -902,6 +923,7 @@ struct default_formatter
         istream >> std::ws >> element;
     }
 
+    // generalize with enable_if_t to parse_element for all char types
     template <typename CharacterType>
     static void parse_char(StreamType& istream, CharacterType& element) noexcept
     {
@@ -919,6 +941,7 @@ struct default_formatter
         element = s[0];
     }
 
+    // TBD can we generalize to cover all char types?
     static void parse_element(StreamType& istream, char& element) noexcept
     {
         parse_char<char>(istream, element);
@@ -929,6 +952,7 @@ struct default_formatter
         parse_char<wchar_t>(istream, element);
     }
 
+    // generalize with enable_if_t to parse_element for all char array types
     template <typename CharacterType, std::size_t ArraySize>
     static void parse_char_array(
         StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
@@ -948,6 +972,7 @@ struct default_formatter
         std::fill(it, std::end(element), CharacterType('\0'));
     }
 
+    // TBD can we generalize to cover all char types?
     template <std::size_t ArraySize>
     static void parse_element(
         StreamType& istream, char (&element)[ArraySize]) noexcept
