@@ -262,6 +262,32 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace
     : public std::true_type
 {};
 
+template <typename Type>
+struct is_char_variant : public std::false_type
+{};
+
+template <>
+struct is_char_variant<char> : public std::true_type
+{};
+
+template <>
+struct is_char_variant<wchar_t> : public std::true_type
+{};
+
+#if (__cplusplus > 201703L)
+template <>
+struct is_char_variant<char8_t> : public std::true_type
+{};
+
+#endif
+template <>
+struct is_char_variant<char16_t> : public std::true_type
+{};
+
+template <>
+struct is_char_variant<char32_t> : public std::true_type
+{};
+
 } // namespace traits
 
 namespace strings {
@@ -1444,23 +1470,18 @@ struct default_formatter
     }
 
     template <typename ElementType>
-    static void print_element(StreamType& ostream, const ElementType& element) noexcept
+    static auto print_element(StreamType& ostream, const ElementType& element
+        ) noexcept -> std::enable_if_t<
+            !traits::is_char_variant<ElementType>::value,
+            void>
     {
         ostream << element;
     }
 
-    // !!! ambiguous with default print_element
-    // TBD remove repeated is_same tests by creating traits::is_char_type
     template<typename CharType>
     static auto print_element(StreamType& ostream, const CharType element
         ) noexcept -> std::enable_if_t<
-            std::is_same<CharType, char>::value ||
-            std::is_same<CharType, wchar_t>::value ||
-#if (__cplusplus > 201703L)
-            std::is_same<CharType, char8_t>::value ||
-#endif
-            std::is_same<CharType, char16_t>::value ||
-            std::is_same<CharType, char32_t>::value,
+            traits::is_char_variant<CharType>::value,
             void>
     {
         if (static_cast<repr_type>(
@@ -1490,13 +1511,7 @@ struct default_formatter
     template <typename CharType>
     static auto print_element(StreamType& ostream, const CharType* element
         ) noexcept -> std::enable_if_t<
-            std::is_same<CharType, char>::value ||
-            std::is_same<CharType, wchar_t>::value ||
-#if (__cplusplus > 201703L)
-            std::is_same<CharType, char8_t>::value ||
-#endif
-            std::is_same<CharType, char16_t>::value ||
-            std::is_same<CharType, char32_t>::value,
+            traits::is_char_variant<CharType>::value,
             void>
     {
         print_string(ostream, element);
