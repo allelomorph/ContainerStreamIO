@@ -288,6 +288,44 @@ template <>
 struct is_char_variant<char32_t> : public std::true_type
 {};
 
+template <typename Type>
+struct is_string_variant : public std::false_type
+{};
+
+template <typename CharType>
+struct is_string_variant<CharType*> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+
+template <typename CharType>
+struct is_string_variant<const CharType*> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+
+template <typename CharType>
+struct is_string_variant<std::basic_string<CharType>> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+
+// TBD const string and const string_view not really needed when
+//   default_formatter print/parse funcs always pass const &
+template <typename CharType>
+struct is_string_variant<const std::basic_string<CharType>> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+
+#if (__cplusplus >= 201703L)
+template <typename CharType>
+struct is_string_variant<std::basic_string_view<CharType>> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+
+template <typename CharType>
+struct is_string_variant<const std::basic_string_view<CharType>> :
+    public std::integral_constant<bool, is_char_variant<CharType>::value>
+{};
+#endif  // C++17 and above
+
 } // namespace traits
 
 namespace strings {
@@ -1472,7 +1510,8 @@ struct default_formatter
     template <typename ElementType>
     static auto print_element(StreamType& ostream, const ElementType& element
         ) noexcept -> std::enable_if_t<
-            !traits::is_char_variant<ElementType>::value,
+            !traits::is_char_variant<ElementType>::value &&
+            !traits::is_string_variant<ElementType>::value,
             void>
     {
         ostream << element;
@@ -1497,8 +1536,11 @@ struct default_formatter
         }
     }
 
-    template <typename StringType>
-    static void print_string(StreamType& ostream, const StringType& element) noexcept
+    template <typename ElementType>
+    static auto print_element(StreamType& ostream, const ElementType& element
+        ) noexcept -> std::enable_if_t<
+            traits::is_string_variant<ElementType>::value,
+            void>
     {
         if (static_cast<repr_type>(
                 ostream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
@@ -1507,32 +1549,6 @@ struct default_formatter
             ostream << strings::literal(element);
     }
 
-    // rely on CharType[ArraySize] decay
-    template <typename CharType>
-    static auto print_element(StreamType& ostream, const CharType* element
-        ) noexcept -> std::enable_if_t<
-            traits::is_char_variant<CharType>::value,
-            void>
-    {
-        print_string(ostream, element);
-    }
-
-    template<typename CharType>
-    static void print_element(StreamType& ostream,
-                              const std::basic_string<CharType>& element) noexcept
-    {
-        print_string(ostream, element);
-    }
-
-#if (__cplusplus >= 201703L)
-    template<typename CharType>
-    static void print_element(StreamType& ostream,
-                              const std::basic_string_view<CharType>& element) noexcept
-    {
-        print_string(ostream, element);
-    }
-
-#endif
     static void print_separator(StreamType& ostream) noexcept
     {
         ostream << decorators.separator << decorators.whitespace;
