@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>    // (u)int_XX_t
 #include <algorithm>  // copy find_if for_each (limits:numeric_limits)
 // #include <cstddef>    // size_t
 #include <iostream>
@@ -617,44 +618,53 @@ static void insert_literal_prefix(
         os << CHAR_LITERAL(StreamCharType, 'U');
 }
 
+
+// stream and string char types differ
+//     hex escape all
+// stream and string char types same
+//     quoted - escape delim, escape
+//     literal - escape delim, escape, escape seqs; hex escape other non-printable ASCII-7
+// TBD revise to always stream ascii-7 code points the same regardless of types
 template<typename StreamCharType, typename StringType, typename StringCharType>
 static void insert_escaped_char(
     std::basic_ostream<StreamCharType>& os,
     const string_repr<StringType, StringCharType>& repr,
     const StringCharType c)
 {
-    static constexpr unsigned int hex_mask {
+    static constexpr uint32_t hex_mask {
         (sizeof(StringCharType) == 1) ? 0xff :
         (sizeof(StringCharType) == 2) ? 0xffff :
                                         0xffffffff };
 
-    // 7-bit ASCII code points inserted regardless of char width
+    const bool same_char_type { std::is_same<StringCharType, StreamCharType>::value };
     // string_repr ctor enforces ASCII-printable delim and escape
-    if (c <= 0x7f && std::isprint(c))
-    {
-        if (c == repr.delim || c == repr.escape)
-            os << StreamCharType(repr.escape);
-        os << StreamCharType(c);
-    }
-    else if (repr.type == repr_type::literal ||
-             !std::is_same<StringCharType, StreamCharType>::value)
+    if (!same_char_type ||
+        (repr.type == repr_type::literal && c <= 0x7f && !std::isprint(c)))
     {
         os << StreamCharType(repr.escape);
         auto esc_it { std::find_if(
                 repr.escape_seqs.begin(), repr.escape_seqs.end(),
                 [&c](const escape_seq<StringCharType>& seq){
                     return seq.actual == c; }) };
-        if (esc_it != repr.escape_seqs.end())  // standard escape sequence
+        if (same_char_type && esc_it != repr.escape_seqs.end())
         {
+            // standard escape sequence
             os << StreamCharType(esc_it->symbol);
         }
-        else  // custom hex escape sequence
+        else
         {
+            // custom hex escape sequence
             os << StreamCharType('x') <<
                 std::hex << std::setfill(StreamCharType('0')) <<
                 std::setw(2 * sizeof(StringCharType)) <<
                 (hex_mask & static_cast<unsigned int>(c));
         }
+    }
+    else
+    {
+        if (c == repr.delim || c == repr.escape)
+            os << StreamCharType(repr.escape);
+        os << StreamCharType(c);
     }
 }
 
@@ -692,83 +702,123 @@ auto operator<<(
     return ostream << oss.str();
 }
 
-// !!! hex escape interpretation must be strict to string char width, (2 hex digits
-//   for chars, 8 for (glibc) wchar_t,) eg "\xfff" should extract to chars '\xff', 'f'
+template<typename StreamCharType, typename StringCharType>
+static void extract_literal_prefix(
+    std::basic_istream<StreamCharType>& istream)
+{
+    if (std::is_same<StringCharType, wchar_t>::value &&
+        istream.get() != StreamCharType('L'))
+        istream.setstate(std::ios_base::failbit);
+
+#if (__cplusplus > 201703L)
+    if (std::is_same<StringCharType, char8_t>::value &&
+        (istream.get() != StreamCharType('u') ||
+         istream.get() != StreamCharType('8')))
+        istream.setstate(std::ios_base::failbit);
+#endif
+
+    if (std::is_same<StringCharType, char16_t>::value &&
+        istream.get() != StreamCharType('u'))
+        istream.setstate(std::ios_base::failbit);
+
+    if (std::is_same<StringCharType, char32_t>::value &&
+        istream.get() != StreamCharType('U'))
+        istream.setstate(std::ios_base::failbit);
+}
+
+template<typename StreamCharType, typename StringCharType>
+static int64_t extract_fixed_width_hex_value(
+    std::basic_istream<StreamCharType>& istream)
+{
+    constexpr uint32_t hex_length { sizeof(StringCharType) * 2 };
+    StreamCharType buff[hex_length + 1] {};
+    istream.get(buff, hex_length + 1);
+    StreamCharType* end_p;
+    // strtol returns signed values, but interprets hex as unsigned
+    int64_t hex_val { std::strtol(buff, &end_p, 16) };
+    if (end_p != &buff[hex_length])
+        istream.setstate(std::ios_base::failbit);
+    return hex_val;
+}
+
 /**
  * @brief Extractor for delimited strings.
  *
  * Differs from iomanip + bits/quoted_string.h version in that failure to extract
  * leading and trailing delimiters counts as extraction failure.
  */
-template<typename CharacterType, typename TraitsType, typename AllocatorType>
-std::basic_istream<CharacterType, TraitsType>& operator>>(
-    std::basic_istream<CharacterType, TraitsType>& istream,
-    const string_repr<std::basic_string<CharacterType, TraitsType, AllocatorType>&, CharacterType>& str)
+template<typename StreamCharType, typename StringCharType>
+auto operator>>(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr
+    ) -> std::basic_istream<StreamCharType>&
 {
-    CharacterType c;
-    if (std::is_same<CharacterType, wchar_t>::value)
-    {
-        istream >> c;
-        if (c != L'L')
-            istream.setstate(std::ios_base::failbit);
-        if (!istream.good())
-            return istream;
-    }
+    // !!? can we pass only StringCharType to template?
+    extract_literal_prefix<StreamCharType, StringCharType>(istream);
+    if (!istream.good())
+        return istream;
+    StreamCharType c;
     istream >> c;
-    if (c != str.delim)
+    if (c != StreamCharType(repr.delim))
         istream.setstate(std::ios_base::failbit);
     if (!istream.good())
         return istream;
-    std::decay_t<decltype(str.string)> temp;
+    std::basic_string<StringCharType> temp;
+//    std::decay_t<decltype(repr.string)> temp;
     std::ios_base::fmtflags orig_flags {
         istream.flags(istream.flags() & ~std::ios_base::skipws) };
-    for (istream >> c; istream.good() && c != str.delim; istream >> c) {
-        if (c != str.escape)
+    for (istream >> c;
+         istream.good() && c != StreamCharType(repr.delim); istream >> c) {
+        if (c != StreamCharType(repr.escape))
         {
-            temp += c;
+            temp += StringCharType(c);
             continue;
         }
         istream >> c;
         if (!istream.good())
             break;
-        if (c == str.escape || c == str.delim)
+        if (c == StreamCharType(repr.escape) ||
+            c == StreamCharType(repr.delim))
         {
-            temp += c;
+            temp += StringCharType(c);
             continue;
         }
-        if (str.type == repr_type::literal)
+        if (!std::is_same<StringCharType, StreamCharType>::value ||
+              repr.type == repr_type::literal)
         {
             // '\?' -> '?' omitted from ascii_escapes as it is only relevant
             //   during istream extraction
-            if (c == CharacterType('?'))
+            if (c == StreamCharType('?'))
             {
-                temp += c;
+                temp += StringCharType(c);
                 continue;
             }
             auto esc_it {std::find_if(
-                    str.escape_seqs.begin(), str.escape_seqs.end(),
-                    [&c](const escape_seq<CharacterType>& seq){ return seq.symbol == c; })};
-            if (esc_it != str.escape_seqs.end())  // standard escape sequence
+                    repr.escape_seqs.begin(), repr.escape_seqs.end(),
+                    [&c](const escape_seq<StringCharType>& seq){
+                        return StreamCharType(seq.symbol) == c; })};
+            if (esc_it != repr.escape_seqs.end())  // standard escape sequence
             {
                 temp += esc_it->actual;
                 continue;
             }
-            else if (c == CharacterType('x')) // custom hex escape sequence
+            else if (c == StreamCharType('x')) // custom hex escape sequence
             {
-                int hex_val;
-                istream >> std::hex >> std::setw(2) >> hex_val;
-                temp += CharacterType(hex_val);
+                // !!? can we pass only StringCharType to template?
+                temp += StringCharType(
+                    extract_fixed_width_hex_value<
+                    StreamCharType, StringCharType>(istream));
                 continue;
             }
         }
         // invalid escape
         istream.setstate(std::ios_base::failbit);
     };
-    if (c != str.delim)
+    if (c != StreamCharType(repr.delim))
         istream.setstate(std::ios_base::failbit);
     istream.setf(orig_flags);
     if (!istream.fail() && !istream.bad())
-        str.string = std::move(temp);
+        repr.string = std::move(temp);
     return istream;
 }
 
@@ -997,6 +1047,7 @@ struct default_formatter
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, stream_char_type>::values;
 
+    // !!? move to declare in namespace input, but before strings::detail::operator>>(string_repr)
     // attempts extraction of exact token, returns chars to stream on failure
     static void extract_token(
         StreamType& istream, const stream_char_type* token)
