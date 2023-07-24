@@ -105,7 +105,7 @@ template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<std::array<ArrayType, ArraySize>> : public std::true_type
 {};
 
-/// TBD C array strings need to also handle uintXX_t cases
+// TBD C array strings need to also handle uintXX_t cases
 /**
  * @brief Specialization to treat C arrays as parseable container types.
  */
@@ -113,6 +113,7 @@ template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
 {};
 
+// TBD add overloads for other char types
 /**
  * @brief Narrow character array specialization meant to ensure that we print
  * character arrays as strings and not as delimiter containers of individual
@@ -191,6 +192,7 @@ template <typename ArrayType, std::size_t ArraySize>
 struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
 {};
 
+// TBD add overloads for other char types
 /**
  * @brief Narrow character array specialization meant to ensure that we print
  * character arrays as strings and not as delimiter containers of individual
@@ -1047,8 +1049,7 @@ struct default_formatter
     static constexpr auto decorators = container_stream_io::decorator::delimiters<
         ContainerType, stream_char_type>::values;
 
-    // !!? move to declare in namespace input, but before strings::detail::operator>>(string_repr)
-    // attempts extraction of exact token, returns chars to stream on failure
+    // attempts extraction of exact token
     static void extract_token(
         StreamType& istream, const stream_char_type* token)
     {
@@ -1066,20 +1067,14 @@ struct default_formatter
         };
         istream >> std::ws;
         auto it_1 { token_s.begin() };
-        while (!istream.eof() && it_1 != token_s.end() &&
+        while (istream.good() && it_1 != token_s.end() &&
                stream_char_type(istream.peek()) == *it_1)
         {
             istream.get();
             ++it_1;
         }
         if (it_1 != token_s.end())
-        {
-            // only partial token match, return chars to stream
-            for (auto it_2 {token_s.begin()}; it_2 != it_1; ++it_2)
-                istream.putback(*it_2);
             istream.setstate(std::ios_base::failbit);
-        }
-        return;
     }
 
     static void parse_prefix(StreamType& istream) noexcept
@@ -1088,78 +1083,69 @@ struct default_formatter
     }
 
     template <typename ElementType>
-    static void parse_element(StreamType& istream, ElementType& element) noexcept
+    static auto parse_element(StreamType& istream, ElementType& element
+        ) noexcept -> std::enable_if_t<
+            !traits::is_char_variant<ElementType>::value,
+            void>
     {
         istream >> std::ws >> element;
     }
 
-    // generalize with enable_if_t to parse_element for all char types
-    template <typename CharacterType>
-    static void parse_char(StreamType& istream, CharacterType& element) noexcept
+    template <typename CharType>
+    static auto parse_element(StreamType& istream, CharType& element
+        ) noexcept -> std::enable_if_t<
+            traits::is_char_variant<CharType>::value,
+            void>
     {
-        std::basic_string<CharacterType> s;
+        std::basic_string<CharType> s;
         if (static_cast<repr_type>(
                 istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-            istream >> std::ws >> strings::quoted(s, CharacterType('\''));
+            istream >> std::ws >> strings::quoted(s, CharType('\''));
         else
-            istream >> std::ws >> strings::literal(s, CharacterType('\''));
-        if (s.size() != 1)
-        {
+            istream >> std::ws >> strings::literal(s, CharType('\''));
+        if (s.size() == 1)
+            element = s[0];
+        else
             istream.setstate(std::ios_base::failbit);
-            return;
-        }
-        element = s[0];
     }
 
-    // TBD can we generalize to cover all char types?
-    static void parse_element(StreamType& istream, char& element) noexcept
+    template <typename ElementType, std::size_t ArraySize>
+    static auto parse_element(
+        StreamType& istream, ElementType (&element)[ArraySize]
+        ) noexcept -> std::enable_if_t<
+            !traits::is_char_variant<ElementType>::value,
+            void>
     {
-        parse_char<char>(istream, element);
+        istream >> std::ws >> element;
     }
 
-    static void parse_element(StreamType& istream, wchar_t& element) noexcept
+    template <typename CharType, std::size_t ArraySize>
+    static auto parse_element(
+        StreamType& istream, CharType (&element)[ArraySize]
+        ) noexcept -> std::enable_if_t<
+            traits::is_char_variant<CharType>::value,
+            void>
     {
-        parse_char<wchar_t>(istream, element);
-    }
-
-    // generalize with enable_if_t to parse_element for all char array types
-    template <typename CharacterType, std::size_t ArraySize>
-    static void parse_char_array(
-        StreamType& istream, CharacterType (&element)[ArraySize]) noexcept
-    {
-        std::basic_string<CharacterType> s;
+        std::basic_string<CharType> s;
         if (static_cast<repr_type>(
                 istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
             istream >> std::ws >> strings::quoted(s);
         else
             istream >> std::ws >> strings::literal(s);
-        if (s.size() > ArraySize - 1)
+        if (s.size() < ArraySize)
+        {
+            auto it {std::copy(s.begin(), s.end(), std::begin(element))};
+            std::fill(it, std::end(element), CharType('\0'));
+        }
+        else
         {
             istream.setstate(std::ios_base::failbit);
-            return;
         }
-        auto it {std::copy(s.begin(), s.end(), std::begin(element))};
-        std::fill(it, std::end(element), CharacterType('\0'));
     }
 
-    // TBD can we generalize to cover all char types?
-    template <std::size_t ArraySize>
+    template<typename CharType>
     static void parse_element(
-        StreamType& istream, char (&element)[ArraySize]) noexcept
-    {
-        parse_char_array<char, ArraySize>(istream, element);
-    }
-
-    template <std::size_t ArraySize>
-    static void parse_element(
-        StreamType& istream, wchar_t (&element)[ArraySize]) noexcept
-    {
-        parse_char_array<wchar_t, ArraySize>(istream, element);
-    }
-
-    template<typename CharacterType>
-    static void parse_element(
-        StreamType& istream, std::basic_string<CharacterType>& element) noexcept
+        StreamType& istream, std::basic_string<CharType>& element) noexcept
     {
         if (static_cast<repr_type>(
                 istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
@@ -1168,21 +1154,9 @@ struct default_formatter
             istream >> std::ws >> strings::literal(element);
     }
 
-#if (__cplusplus >= 201703L)
-    template<typename CharacterType>
-    static void parse_element(
-        StreamType& istream, std::basic_string_view<CharacterType>& element) noexcept
-    {
-        std::basic_string<CharacterType> s;
-        if (static_cast<repr_type>(
-                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-            istream >> std::ws >> strings::quoted(s);
-        else
-            istream >> std::ws >> strings::literal(s);
-        element = std::basic_string_view<CharacterType> {s.c_str()};
-    }
+    // !!! should not stream into a string_view, as it could be equivalent to
+    //   a CharType* of unknown allocation
 
-#endif
     static void parse_separator(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.separator);
