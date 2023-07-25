@@ -56,6 +56,32 @@ namespace container_stream_io {
 
 namespace traits {
 
+template <typename Type>
+struct is_char_variant : public std::false_type
+{};
+
+template <>
+struct is_char_variant<char> : public std::true_type
+{};
+
+template <>
+struct is_char_variant<wchar_t> : public std::true_type
+{};
+
+#if (__cplusplus > 201703L)
+template <>
+struct is_char_variant<char8_t> : public std::true_type
+{};
+
+#endif
+template <>
+struct is_char_variant<char16_t> : public std::true_type
+{};
+
+template <>
+struct is_char_variant<char32_t> : public std::true_type
+{};
+
 /**
  * @brief Base case for the testing of STL compatible container types.
  */
@@ -63,6 +89,8 @@ template <typename Type, typename = void>
 struct is_parseable_as_container : public std::false_type
 {};
 
+// !!! this generic omits basic_string_view (which misses clear()), as it should, but it
+//   includes basic_string, which necessitates basic_string overload below
 // !!! unlike the generic version of is_printable_as_container, this generic
 //   does not include std::array, which lacks clear()
 // TBD if we can commit to move-assigning a new container into the extraction target,
@@ -105,33 +133,27 @@ template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<std::array<ArrayType, ArraySize>> : public std::true_type
 {};
 
-// TBD C array strings need to also handle uintXX_t cases
 /**
- * @brief Specialization to treat C arrays as parseable container types.
+ * @brief Specialization to treat non-character C arrays as parseable container types.
  */
 template <typename ArrayType, std::size_t ArraySize>
-struct is_parseable_as_container<ArrayType[ArraySize]> : public std::true_type
-{};
-
-// TBD add overloads for other char types
-/**
- * @brief Narrow character array specialization meant to ensure that we print
- * character arrays as strings and not as delimiter containers of individual
- * characters.
- */
-template <std::size_t ArraySize>
-struct is_parseable_as_container<char[ArraySize]> : public std::false_type
+struct is_parseable_as_container<ArrayType[ArraySize],
+                                 std::enable_if_t<!is_char_variant<ArrayType>::value,
+                                                  void>> : public std::true_type
 {};
 
 /**
- * @brief Wide character array specialization meant to ensure that we print
+ * @brief Character C array specialization meant to ensure that we print
  * character arrays as strings and not as delimiter containers of individual
  * characters.
  */
-template <std::size_t ArraySize>
-struct is_parseable_as_container<wchar_t[ArraySize]> : public std::false_type
+template <typename CharType, std::size_t ArraySize>
+struct is_parseable_as_container<CharType[ArraySize],
+                                 std::enable_if_t<is_char_variant<CharType>::value,
+                                                  void>> : public std::false_type
 {};
 
+// see note on default specialization above
 /**
  * @brief String specialization meant to ensure that we treat strings as nothing
  * more than strings.
@@ -157,6 +179,7 @@ template <typename Type, typename = void>
 struct is_printable_as_container : public std::false_type
 {};
 
+// generic
 /**
  * @brief Specialization to ensure that Standard Library compatible containers
  * that have begin(), end(), and empty() member functions are treated as
@@ -186,31 +209,26 @@ struct is_printable_as_container<std::tuple<Args...>> : public std::true_type
 {};
 
 /**
- * @brief Specialization to treat arrays as printable container types.
+ * @brief Specialization to treat non-character C arrays as printable container types.
  */
 template <typename ArrayType, std::size_t ArraySize>
-struct is_printable_as_container<ArrayType[ArraySize]> : public std::true_type
-{};
-
-// TBD add overloads for other char types
-/**
- * @brief Narrow character array specialization meant to ensure that we print
- * character arrays as strings and not as delimiter containers of individual
- * characters.
- */
-template <std::size_t ArraySize>
-struct is_printable_as_container<char[ArraySize]> : public std::false_type
+struct is_printable_as_container<ArrayType[ArraySize],
+                                 std::enable_if_t<!is_char_variant<ArrayType>::value,
+                                                  void>> : public std::true_type
 {};
 
 /**
- * @brief Wide character array specialization meant to ensure that we print
+ * @brief Character C array specialization meant to ensure that we print
  * character arrays as strings and not as delimiter containers of individual
  * characters.
  */
-template <std::size_t ArraySize>
-struct is_printable_as_container<wchar_t[ArraySize]> : public std::false_type
+template <typename CharType, std::size_t ArraySize>
+struct is_printable_as_container<CharType[ArraySize],
+                                 std::enable_if_t<is_char_variant<CharType>::value,
+                                                  void>> : public std::false_type
 {};
 
+// exclude strings from generic
 /**
  * @brief String specialization meant to ensure that we treat strings as nothing
  * more than strings.
@@ -263,32 +281,6 @@ struct has_emplace_back : public std::false_type
 template <typename Type>
 struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
     : public std::true_type
-{};
-
-template <typename Type>
-struct is_char_variant : public std::false_type
-{};
-
-template <>
-struct is_char_variant<char> : public std::true_type
-{};
-
-template <>
-struct is_char_variant<wchar_t> : public std::true_type
-{};
-
-#if (__cplusplus > 201703L)
-template <>
-struct is_char_variant<char8_t> : public std::true_type
-{};
-
-#endif
-template <>
-struct is_char_variant<char16_t> : public std::true_type
-{};
-
-template <>
-struct is_char_variant<char32_t> : public std::true_type
 {};
 
 template <typename Type>
