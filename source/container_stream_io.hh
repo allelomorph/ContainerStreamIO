@@ -266,11 +266,18 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 }
 
 template <typename Type, typename = void>
-struct has_emplace : public std::false_type
+struct has_iterless_emplace : public std::false_type
 {};
 
+// !!! This only tests for overloads that can take no args, eg emplace(args...)
+//   for std::(unordered_)(multi)set and std::(unordered_)(multi)map. Containers
+//   with emplace(const_iterator, args...), eg std::vector, std::list, and
+//   std::deque could, be tested for with
+//   `.emplace(declval<typename Type::const_iterator>())`, see:
+//   detection idiom: https://stackoverflow.com/a/41936999
+//   detection idiom mod for variadics: https://stackoverflow.com/a/35669421
 template <typename Type>
-struct has_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
+struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
     : public std::true_type
 {};
 
@@ -1190,7 +1197,7 @@ template <typename ContainerType, typename KeyType, typename ValueType>
 static auto emplace_element(
     ContainerType& container,
     const std::pair<const KeyType, ValueType>& element) noexcept -> std::enable_if_t<
-        container_stream_io::traits::has_emplace<ContainerType>::value, void>
+        container_stream_io::traits::has_iterless_emplace<ContainerType>::value, void>
 {
     container.emplace(element.first, element.second);
 }
@@ -1199,7 +1206,7 @@ static auto emplace_element(
 template <typename ContainerType, typename ElementType>
 static auto emplace_element(
     ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-        container_stream_io::traits::has_emplace<ContainerType>::value &&
+        container_stream_io::traits::has_iterless_emplace<ContainerType>::value &&
         !container_stream_io::traits::has_emplace_back<ContainerType>::value &&
         std::is_move_assignable<ElementType>::value, void>
 {
