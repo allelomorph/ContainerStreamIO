@@ -114,6 +114,22 @@ auto idiomatic_strcmp(const CStrTypeA s1, const CStrTypeB s2
 #endif
 }
 
+template<typename CharType>
+void reset_ostringstream(std::basic_ostringstream<CharType>& oss)
+{
+    CharType s[1] { 0 };  // char type-agnostic ""
+    oss.str(s);
+    oss.clear();
+}
+
+template<typename CharType>
+void reset_istringstream(std::basic_istringstream<CharType>& iss)
+{
+    CharType s[1] { 0 };  // char type-agnostic ""
+    iss.str(s);
+    iss.clear();
+}
+
 } // namespace
 
 TEST_CASE("Traits: detect parseable (input stream extractable) container types",
@@ -305,6 +321,247 @@ TEST_CASE("Traits: detect emplace methods", "[traits]")
 
     REQUIRE(traits::has_iterless_emplace<int>::value == false);
     REQUIRE(traits::has_emplace_back<int>::value == false);
+}
+
+TEST_CASE("Strings: printing char/string types as escaped literals",
+          "[literal],[strings],[output]")
+{
+    using namespace container_stream_io;
+
+    std::ostringstream oss;
+    std::wostringstream woss;
+
+    SECTION("Char/string types outside supported containers can be printed as "
+            "literals using literal()")
+    {
+        oss << '\t';
+        REQUIRE(oss.str() == "\t");
+
+        reset_ostringstream(oss);
+        oss << strings::literal('\t');
+        REQUIRE(oss.str() == "'\\t'");
+
+        reset_ostringstream(oss);
+        oss << "tes\t";
+        REQUIRE(oss.str() == "tes\t");
+
+        reset_ostringstream(oss);
+        oss << strings::literal("tes\t");
+        REQUIRE(oss.str() == "\"tes\\t\"");
+
+        std::string s { "tes\t" };
+        reset_ostringstream(oss);
+        oss << s;
+        REQUIRE(oss.str() == "tes\t");
+
+        reset_ostringstream(oss);
+        oss << strings::literal(s);
+        REQUIRE(oss.str() == "\"tes\\t\"");
+
+#if (__cplusplus >= 201703L)
+        std::string_view sv { "tes\t" };
+        reset_ostringstream(oss);
+        oss << sv;
+        REQUIRE(oss.str() == "tes\t");
+
+        reset_ostringstream(oss);
+        oss << strings::literal(sv);
+        REQUIRE(oss.str() == "\"tes\\t\"");
+#endif
+    }
+
+    SECTION("Char/string types inside supported containers printed as literals by default")
+    {
+        std::vector<char> cv { 't', 'e', 's', '\t', '\0' };
+        std::vector<const char*> cpv { "tes\t" };
+        std::vector<std::string> sv { { "tes\t" } };
+        oss << cv;
+        REQUIRE(oss.str() == "['t', 'e', 's', '\\t', '\\0']");
+
+        reset_ostringstream(oss);
+        oss << cpv;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+
+        reset_ostringstream(oss);
+        oss << sv;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+
+#if (__cplusplus >= 201703L)
+        std::vector<std::string_view> svv { { "tes\t" } };
+
+        reset_ostringstream(oss);
+        oss << svv;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+#endif
+    }
+
+    SECTION("Default behavior of printing char/string types inside containers "
+        " can be set with I/O manipulator literalrepr")
+    {
+        std::vector<char> cv { 't', 'e', 's', '\t', '\x7f' };
+        std::vector<const char*> cpv { "tes\t" };
+
+        oss << strings::quotedrepr;
+        oss << cv;
+        REQUIRE(oss.str() == "['t', 'e', 's', '\t', '\x7f']");
+
+        reset_ostringstream(oss);
+        oss << cpv;
+        REQUIRE(oss.str() == "[\"tes\t\"]");
+
+        oss << strings::literalrepr;
+        reset_ostringstream(oss);
+        oss << cv;
+        REQUIRE(oss.str() == "['t', 'e', 's', '\\t', '\\x7f']");
+
+        reset_ostringstream(oss);
+        oss << cpv;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+    }
+
+    SECTION("With different stream and element char types, literal representation "
+            "hex escapes all chars")
+    {
+        std::string s { "test" };
+        std::wstring ws { L"test" };
+        std::vector<std::string> sv { { "test" } };
+        std::vector<std::wstring> wsv { { L"test" } };
+
+        oss << strings::literal(ws);
+        REQUIRE(oss.str() == "L\"\\x00000074\\x00000065\\x00000073\\x00000074\"");
+
+        reset_ostringstream(oss);
+        oss << wsv;
+        REQUIRE(oss.str() == "[L\"\\x00000074\\x00000065\\x00000073\\x00000074\"]");
+
+        woss << strings::literal(s);
+        REQUIRE(woss.str() == L"\"\\x74\\x65\\x73\\x74\"");
+
+        reset_ostringstream(woss);
+        woss << sv;
+        REQUIRE(woss.str() == L"[\"\\x74\\x65\\x73\\x74\"]");
+    }
+
+    SECTION("With same stream and element char types, literal representation "
+            "escapes the delimiter, escape, and standard ASCII-7 escaped chars, "
+            " hex escaping all other unprintable ASCII-7")
+    {
+        std::string s { "t\\\"\t\x7f" };
+        std::wstring ws { L"t\\\"\t\x7f" };
+        std::vector<std::string> sv { { "t\\\"\t\x7f" } };
+        std::vector<std::wstring> wsv { { L"t\\\"\t\x7f" } };
+
+        oss << strings::literal(ws);
+        REQUIRE(oss.str() == "L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\"");
+
+        reset_ostringstream(oss);
+        oss << wsv;
+        REQUIRE(oss.str() == "[L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\"]");
+
+        woss << strings::literal(s);
+        REQUIRE(woss.str() == L"\"\\x74\\x5c\\x22\\x09\\x7f\"");
+
+        reset_ostringstream(woss);
+        woss << sv;
+        REQUIRE(woss.str() == L"[\"\\x74\\x5c\\x22\\x09\\x7f\"]");
+    }
+}
+
+TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
+          "[literal],[strings],[input]")
+{
+    SECTION("Chars and STL strings outside containers can be parsed as "
+            "literals using literal()")
+    {
+    }
+
+    SECTION("Chars and STL strings inside containers parsed as literals by default")
+    {
+    }
+
+    SECTION("Default behavior of parsing chars/STL strings inside containers "
+        " can be set with I/O manipulator literalrepr")
+    {
+    }
+
+    SECTION("With different stream and element char types, literal representation "
+            "hex escapes all chars")
+    {
+    }
+
+    SECTION("With same stream and element char types, literal representation "
+            "escapes the delimiter, escape, and standard ASCII-7 escaped chars, "
+            " hex escaping all other unprintable ASCII-7")
+    {
+    }
+}
+
+TEST_CASE("Strings: printing char/string types as quoted strings",
+          "[quoted],[strings],[output]")
+{
+    SECTION("Char/string types outside containers can be printed as quoted using quoted()")
+    {
+    }
+
+    SECTION("Char/string types inside containers are not printed as quoted by default")
+    {
+    }
+
+    SECTION("Default behavior of printing char/string types inside containers "
+        " can be set with I/O manipulator quotedrepr")
+    {
+    }
+
+    SECTION("With different stream and element char types, quoted representation "
+            "hex escapes all chars")
+    {
+    }
+
+    SECTION("With same stream and element char types, quoted representation "
+            "escapes only the delimiter and escape chars, inserting the rest directly")
+    {
+    }
+
+#if (__cplusplus >= 201402L)
+    SECTION("With same stream and element char types, quoted representation "
+            "should match std::quoted")
+    {
+    }
+#endif
+}
+
+TEST_CASE("Strings: parsing chars/STL strings as quoted strings",
+          "[quoted],[strings],[input]")
+{
+    SECTION("Chars/STL strings outside containers can be parsed as quoted using quoted()")
+    {
+    }
+
+    SECTION("Chars/STL strings inside containers not parsed as quoted by default")
+    {
+    }
+
+    SECTION("Default behavior of parsing chars/STL strings inside containers "
+        " can be set with I/O manipulator quotedrepr")
+    {
+    }
+
+    SECTION("With different stream and element char types, quoted representation "
+            "hex escapes all chars")
+    {
+    }
+
+    SECTION("With same stream and element char types, quoted representation "
+            "escapes only the delimiter and escape chars, extracting the rest directly")
+    {
+    }
+
+#if (__cplusplus >= 201402L)
+    SECTION("With same stream and element char types, quoted representation "
+            "should match std::quoted")
+    {
+    }
+#endif
 }
 
 TEST_CASE("Delimiters: validate char defaults", "[decorator]")
