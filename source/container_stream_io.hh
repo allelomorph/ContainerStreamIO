@@ -840,7 +840,8 @@ template<typename CharacterType, typename TraitsType>
 std::basic_ios<CharacterType, TraitsType>& literalrepr(
     std::basic_ios<CharacterType, TraitsType>& stream)
 {
-    stream.iword(detail::get_manip_i()) = detail::repr_type::literal;
+    stream.iword(detail::get_manip_i()) =
+        static_cast<int>(detail::repr_type::literal);
     return stream;
 }
 
@@ -849,7 +850,8 @@ template<typename CharacterType, typename TraitsType>
 std::basic_ios<CharacterType, TraitsType>& quotedrepr(
     std::basic_ios<CharacterType, TraitsType>& stream)
 {
-    stream.iword(detail::get_manip_i()) = detail::repr_type::quoted;
+    stream.iword(detail::get_manip_i()) =
+        static_cast<int>(detail::repr_type::quoted);
     return stream;
 }
 
