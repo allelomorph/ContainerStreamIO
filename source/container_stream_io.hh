@@ -553,7 +553,7 @@ struct string_repr
 {
     static_assert(std::is_pointer<StringType>::value ||
                   std::is_reference<StringType>::value,
-                  "String type must be a pointer or reference");
+                  "String type must be a char, pointer or reference");
 
     StringType string;
     CharacterType delim;
@@ -673,7 +673,27 @@ template<typename StreamCharType, typename StringType, typename StringCharType>
 auto operator<<(
     std::basic_ostream<StreamCharType>& ostream,
     const string_repr<StringType, StringCharType>& repr
-    ) -> std::basic_ostream<StreamCharType>&
+    ) -> std::enable_if_t<
+        std::is_same<StringType, StringCharType&>::value ||
+        std::is_same<StringType, const StringCharType&>::value,
+        std::basic_ostream<StreamCharType>&>
+{
+    std::basic_ostringstream<StreamCharType> oss;
+    insert_literal_prefix<StreamCharType, StringCharType>(oss);
+    oss << StreamCharType(repr.delim);
+    insert_escaped_char(oss, repr, repr.string);
+    oss << StreamCharType(repr.delim);
+    return ostream << oss.str();
+}
+
+template<typename StreamCharType, typename StringType, typename StringCharType>
+auto operator<<(
+    std::basic_ostream<StreamCharType>& ostream,
+    const string_repr<StringType, StringCharType>& repr
+    ) -> std::enable_if_t<
+        !std::is_same<StringType, StringCharType&>::value &&
+        !std::is_same<StringType, const StringCharType&>::value,
+        std::basic_ostream<StreamCharType>&>
 {
     std::basic_ostringstream<StreamCharType> oss;
     insert_literal_prefix<StreamCharType, StringCharType>(oss);
@@ -752,30 +772,22 @@ static int64_t extract_fixed_width_hex_value(
     return std::strtol(buff, nullptr, 16);
 }
 
-/**
- * @brief Extractor for delimited strings.
- *
- * Differs from iomanip + bits/quoted_string.h version in that failure to extract
- * leading and trailing delimiters counts as extraction failure.
- */
 template<typename StreamCharType, typename StringCharType>
-auto operator>>(
+void extract_string_repr(
     std::basic_istream<StreamCharType>& istream,
-    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr
-    ) -> std::basic_istream<StreamCharType>&
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr)
 {
     // !!? can we pass only StringCharType to template?
     extract_literal_prefix<StreamCharType, StringCharType>(istream);
     if (!istream.good())
-        return istream;
+        return;
     StreamCharType c;
     istream >> c;
     if (c != StreamCharType(repr.delim))
         istream.setstate(std::ios_base::failbit);
     if (!istream.good())
-        return istream;
+        return;
     std::basic_string<StringCharType> temp;
-//    std::decay_t<decltype(repr.string)> temp;
     std::ios_base::fmtflags orig_flags {
         istream.flags(istream.flags() & ~std::ios_base::skipws) };
     for (istream >> c;
@@ -830,6 +842,32 @@ auto operator>>(
     istream.setf(orig_flags);
     if (!istream.fail() && !istream.bad())
         repr.string = std::move(temp);
+}
+
+template<typename StreamCharType, typename StringCharType>
+auto operator>>(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr
+    ) -> std::basic_istream<StreamCharType>&
+{
+    extract_string_repr(istream, repr);
+    return istream;
+}
+
+template<typename StreamCharType, typename StringCharType>
+auto operator>>(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<StringCharType&, StringCharType>& repr
+    ) -> std::basic_istream<StreamCharType>&
+{
+    string_repr<std::basic_string<StringCharType>&, StringCharType> temp_repr {
+        std::basic_string<StringCharType>{},
+        repr.delim, repr.escape, repr.type };
+    extract_string_repr(istream, temp_repr);
+    if (!istream.fail() && temp_repr.string.size() == 1)
+        repr.string = temp_repr.string[0];
+    else
+        istream.setstate(std::ios_base::failbit);
     return istream;
 }
 
@@ -861,6 +899,30 @@ std::basic_ios<CharacterType, TraitsType>& quotedrepr(
  * @param delim  Character to quote string with.
  * @param escape Escape character to escape itself or quote character.
  */
+template<typename CharType>
+inline auto quoted(
+    CharType& c,
+    CharType delim = CharType('\''), CharType escape = CharType('\\')
+    ) -> std::enable_if_t<
+        traits::is_char_variant<CharType>::value,
+        detail::string_repr<CharType&, CharType>>
+{
+    return detail::string_repr<CharType&, CharType>(
+            c, delim, escape, detail::repr_type::quoted);
+}
+
+template<typename CharType>
+inline auto quoted(
+    const CharType& c,
+    CharType delim = CharType('\''), CharType escape = CharType('\\')
+    ) -> std::enable_if_t<
+        traits::is_char_variant<CharType>::value,
+        detail::string_repr<const CharType&, CharType>>
+{
+    return detail::string_repr<const CharType&, CharType>(
+            c, delim, escape, detail::repr_type::quoted);
+}
+
 template<typename CharType>
 inline auto quoted(
     const CharType* string,
@@ -909,6 +971,30 @@ inline auto quoted(
 	    string_view, delim, escape, detail::repr_type::quoted);
 }
 #endif  // C++17
+
+template<typename CharType>
+inline auto literal(
+    CharType& c,
+    CharType delim = CharType('\''), CharType escape = CharType('\\')
+    ) -> std::enable_if_t<
+        traits::is_char_variant<CharType>::value,
+        detail::string_repr<CharType&, CharType>>
+{
+    return detail::string_repr<CharType&, CharType>(
+            c, delim, escape, detail::repr_type::literal);
+}
+
+template<typename CharType>
+inline auto literal(
+    const CharType& c,
+    CharType delim = CharType('\''), CharType escape = CharType('\\')
+    ) -> std::enable_if_t<
+        traits::is_char_variant<CharType>::value,
+        detail::string_repr<const CharType&, CharType>>
+{
+    return detail::string_repr<const CharType&, CharType>(
+            c, delim, escape, detail::repr_type::literal);
+}
 
 template<typename CharType>
 inline auto literal(
@@ -1093,41 +1179,29 @@ struct default_formatter
         extract_token(istream, decorators.prefix);
     }
 
-    template <typename ElementType>
+    template<typename ElementType, typename CharType>
+    static auto parse_element(
+        StreamType& istream, ElementType& element
+        ) noexcept -> std::enable_if_t<
+            !traits::is_char_variant<ElementType>::value &&
+            !std::is_same<ElementType, std::basic_string<CharType>>::value,
+            void>
+    {
+        istream >> std::ws >> element;
+    }
+
+    template<typename ElementType, typename CharType>
     static auto parse_element(StreamType& istream, ElementType& element
         ) noexcept -> std::enable_if_t<
-            !traits::is_char_variant<ElementType>::value,
+            traits::is_char_variant<ElementType>::value ||
+            std::is_same<ElementType, std::basic_string<CharType>>::value,
             void>
     {
-        istream >> std::ws >> element;
-    }
-
-    template <typename CharType>
-    static auto parse_element(StreamType& istream, CharType& element
-        ) noexcept -> std::enable_if_t<
-            traits::is_char_variant<CharType>::value,
-            void>
-    {
-        std::basic_string<CharType> s;
         if (static_cast<repr_type>(
                 istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-            istream >> std::ws >> strings::quoted(s, CharType('\''));
+            istream >> std::ws >> strings::quoted(element);
         else
-            istream >> std::ws >> strings::literal(s, CharType('\''));
-        if (s.size() == 1)
-            element = s[0];
-        else
-            istream.setstate(std::ios_base::failbit);
-    }
-
-    template <typename ElementType, std::size_t ArraySize>
-    static auto parse_element(
-        StreamType& istream, ElementType (&element)[ArraySize]
-        ) noexcept -> std::enable_if_t<
-            !traits::is_char_variant<ElementType>::value,
-            void>
-    {
-        istream >> std::ws >> element;
+            istream >> std::ws >> strings::literal(element);
     }
 
     template <typename CharType, std::size_t ArraySize>
@@ -1152,17 +1226,6 @@ struct default_formatter
         {
             istream.setstate(std::ios_base::failbit);
         }
-    }
-
-    template<typename CharType>
-    static void parse_element(
-        StreamType& istream, std::basic_string<CharType>& element) noexcept
-    {
-        if (static_cast<repr_type>(
-                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-            istream >> std::ws >> strings::quoted(element);
-        else
-            istream >> std::ws >> strings::literal(element);
     }
 
     // !!! should not stream into a string_view, as it could be equivalent to
@@ -1553,28 +1616,10 @@ struct default_formatter
         ostream << element;
     }
 
-    template<typename CharType>
-    static auto print_element(StreamType& ostream, const CharType element
+    template<typename ElementType>
+    static auto print_element(StreamType& ostream, const ElementType element
         ) noexcept -> std::enable_if_t<
-            traits::is_char_variant<CharType>::value,
-            void>
-    {
-        if (static_cast<repr_type>(
-                ostream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-        {
-            ostream << strings::quoted(
-                std::basic_string<CharType>({ element }), CharType('\''));
-        }
-        else
-        {
-            ostream << strings::literal(
-                std::basic_string<CharType>({ element }), CharType('\''));
-        }
-    }
-
-    template <typename ElementType>
-    static auto print_element(StreamType& ostream, const ElementType& element
-        ) noexcept -> std::enable_if_t<
+            traits::is_char_variant<ElementType>::value ||
             traits::is_string_variant<ElementType>::value,
             void>
     {
