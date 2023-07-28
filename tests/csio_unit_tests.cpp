@@ -155,7 +155,7 @@ void reset_istringstream(
 } // namespace
 
 TEST_CASE("Traits: detect parseable (input stream extractable) container types",
-          "[traits],[input]")
+          "[traits][input]")
 {
     using namespace container_stream_io;
 
@@ -190,7 +190,7 @@ TEST_CASE("Traits: detect parseable (input stream extractable) container types",
 }
 
 TEST_CASE("Traits: detect types not parseable (input stream extractable) as containers",
-          "[traits],[input]")
+          "[traits][input]")
 {
     using namespace container_stream_io;
 
@@ -221,7 +221,7 @@ TEST_CASE("Traits: detect types not parseable (input stream extractable) as cont
 }
 
 TEST_CASE("Traits: detect printable (output stream insertable) container types",
-          "[traits],[output]")
+          "[traits][output]")
 {
     using namespace container_stream_io;
 
@@ -256,7 +256,7 @@ TEST_CASE("Traits: detect printable (output stream insertable) container types",
 }
 
 TEST_CASE("Traits: detect types not printable (output stream insertable) as containers",
-          "[traits],[output]")
+          "[traits][output]")
 {
     using namespace container_stream_io;
 
@@ -346,7 +346,7 @@ TEST_CASE("Traits: detect emplace methods", "[traits]")
 }
 
 TEST_CASE("Strings: printing char/string types as escaped literals",
-          "[literal],[strings],[output]")
+          "[literal][strings][output]")
 {
     using namespace container_stream_io;
 
@@ -503,7 +503,7 @@ TEST_CASE("Strings: printing char/string types as escaped literals",
 }
 
 TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
-          "[literal],[strings],[input]")
+          "[literal][strings][input]")
 {
     using namespace container_stream_io;
 
@@ -661,7 +661,7 @@ TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
 }
 
 TEST_CASE("Strings: printing char/string types as quoted strings",
-          "[quoted],[strings],[output]")
+          "[quoted][strings][output]")
 {
     SECTION("Char/string types outside supported containers can be printed as quoted using quoted()")
     {
@@ -695,7 +695,7 @@ TEST_CASE("Strings: printing char/string types as quoted strings",
 }
 
 TEST_CASE("Strings: parsing chars/STL strings as quoted strings",
-          "[quoted],[strings],[input]")
+          "[quoted][strings][input]")
 {
     SECTION("Chars/STL strings outside supported containers can be parsed as quoted using quoted()")
     {
