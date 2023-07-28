@@ -114,31 +114,42 @@ auto idiomatic_strcmp(const CStrTypeA s1, const CStrTypeB s2
 #endif
 }
 
+using namespace container_stream_io::strings::compile_time;  // string_literal
+
+// TBD these do not affect iword/pword, and so not quoted/literal default
+//   - could use `(o|i)ss.copyfmt(std::basic_(o|i)stringstream<CharType>{});`,
+//   but at that point why not just `(o|i)ss = std::basic_(o|i)stringstream<CharType>{};`?
 template<typename CharType>
 void reset_ostringstream(std::basic_ostringstream<CharType>& oss)
 {
-    CharType s[1] { 0 };  // char type-agnostic ""
-    oss.str(s);
+    static const auto default_flags {
+        std::basic_ostringstream<CharType>{}.flags() };
+    oss.str(STRING_LITERAL(CharType, ""));
     oss.clear();
+    oss.flags(default_flags);
 }
 
-// TBD need to use STRING_LITERAL(CharType, "") on s default value?
-using namespace container_stream_io::strings::compile_time;
 template<typename CharType>
 void reset_istringstream(
     std::basic_istringstream<CharType>& iss,
     const CharType* s = STRING_LITERAL(CharType, ""))
 {
+    static const auto default_flags {
+        std::basic_istringstream<CharType>{}.flags() };
     iss.str(s);
     iss.clear();
+    iss.flags(default_flags);
 }
 
 template<typename CharType>
 void reset_istringstream(
     std::basic_istringstream<CharType>& iss, const std::basic_string<CharType>& s)
 {
+    static const auto default_flags {
+        std::basic_istringstream<CharType>{}.flags() };
     iss.str(s);
     iss.clear();
+    iss.flags(default_flags);
 }
 
 } // namespace
@@ -412,7 +423,18 @@ TEST_CASE("Strings: printing char/string types as escaped literals",
         std::vector<char> cv { 't', 'e', 's', '\t', '\x7f' };
         std::vector<const char*> cpv { "tes\t" };
 
+        // default
+        oss << cv;
+        REQUIRE(oss.str() == "['t', 'e', 's', '\\t', '\\x7f']");
+
+        reset_ostringstream(oss);
+        oss << cpv;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+
+        // change from default
         oss << strings::quotedrepr;
+
+        reset_ostringstream(oss);
         oss << cv;
         REQUIRE(oss.str() == "['t', 'e', 's', '\t', '\x7f']");
 
@@ -420,7 +442,9 @@ TEST_CASE("Strings: printing char/string types as escaped literals",
         oss << cpv;
         REQUIRE(oss.str() == "[\"tes\t\"]");
 
+        // reset to default
         oss << strings::literalrepr;
+
         reset_ostringstream(oss);
         oss << cv;
         REQUIRE(oss.str() == "['t', 'e', 's', '\\t', '\\x7f']");
@@ -433,48 +457,48 @@ TEST_CASE("Strings: printing char/string types as escaped literals",
     SECTION("With different stream and element char types, literal representation "
             "hex escapes all chars")
     {
-        std::wstring ws { L"t\\\"\t\x7f" };
+        std::wstring ws { L"t\\\"\t\x7f\xffffffff" };
         oss << strings::literal(ws);
         REQUIRE(oss.str() ==
-                "L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\"");
+                "L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\\xffffffff\"");
 
-        std::vector<std::wstring> wsv { { L"t\\\"\t\x7f" } };
+        std::vector<std::wstring> wsv { { L"t\\\"\t\x7f\xffffffff" } };
         reset_ostringstream(oss);
         oss << wsv;
         REQUIRE(oss.str() ==
-                "[L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\"]");
+                "[L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\\xffffffff\"]");
 
-        std::string s { "t\\\"\t\x7f" };
+        std::string s { "t\\\"\t\x7f\xff" };
         woss << strings::literal(s);
-        REQUIRE(woss.str() == L"\"\\x74\\x5c\\x22\\x09\\x7f\"");
+        REQUIRE(woss.str() == L"\"\\x74\\x5c\\x22\\x09\\x7f\\xff\"");
 
-        std::vector<std::string> sv { { "t\\\"\t\x7f" } };
+        std::vector<std::string> sv { { "t\\\"\t\x7f\xff" } };
         reset_ostringstream(woss);
         woss << sv;
-        REQUIRE(woss.str() == L"[\"\\x74\\x5c\\x22\\x09\\x7f\"]");
+        REQUIRE(woss.str() == L"[\"\\x74\\x5c\\x22\\x09\\x7f\\xff\"]");
     }
 
     SECTION("With same stream and element char types, literal representation "
             "escapes the delimiter, escape, and standard ASCII-7 escaped chars, "
-            "hex escaping all other unprintable ASCII-7")
+            "hex escaping all other unprintable ASCII-7 or values beyond 7-bit max")
     {
-        std::string s { "t\\\"\t\x7f" };
+        std::string s { "t\\\"\t\x7f\xff" };
         oss << strings::literal(s);
-        REQUIRE(oss.str() == "\"t\\\\\\\"\\t\\x7f\"");
+        REQUIRE(oss.str() == "\"t\\\\\\\"\\t\\x7f\\xff\"");
 
-        std::vector<std::string> sv { { "t\\\"\t\x7f" } };
+        std::vector<std::string> sv { { "t\\\"\t\x7f\xff" } };
         reset_ostringstream(oss);
         oss << sv;
-        REQUIRE(oss.str() == "[\"t\\\\\\\"\\t\\x7f\"]");
+        REQUIRE(oss.str() == "[\"t\\\\\\\"\\t\\x7f\\xff\"]");
 
-        std::wstring ws { L"t\\\"\t\x7f" };
+        std::wstring ws { L"t\\\"\t\x7f\xffffffff" };
         woss << strings::literal(ws);
-        REQUIRE(woss.str() == L"L\"t\\\\\\\"\\t\\x0000007f\"");
+        REQUIRE(woss.str() == L"L\"t\\\\\\\"\\t\\x0000007f\\xffffffff\"");
 
-        std::vector<std::wstring> wsv { { L"t\\\"\t\x7f" } };
+        std::vector<std::wstring> wsv { { L"t\\\"\t\x7f\xffffffff" } };
         reset_ostringstream(woss);
         woss << wsv;
-        REQUIRE(woss.str() == L"[L\"t\\\\\\\"\\t\\x0000007f\"]");
+        REQUIRE(woss.str() == L"[L\"t\\\\\\\"\\t\\x0000007f\\xffffffff\"]");
     }
 }
 
@@ -484,7 +508,7 @@ TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
     using namespace container_stream_io;
 
     std::istringstream iss;
-    // std::wistringstream wiss;
+    std::wistringstream wiss;
 
     SECTION("Chars and STL strings outside supported containers can be parsed as "
             "literals using literal()")
@@ -498,20 +522,15 @@ TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
         iss >> strings::literal(c);
         REQUIRE(c == '\t');
 
-        // "tes\t" will extract as "tes" due to trailing whitespace signaling
-        //   end of token (skipws only affects treatment of leading ws)
         std::string s;
-        reset_istringstream(iss, "tes\t");
+        reset_istringstream(iss, "tes\x7f");
         iss >> std::noskipws >> s >> std::skipws;
-        REQUIRE(s == "tes");
+        REQUIRE(s == "tes\x7f");
 
-        // TBD this trailing whitespace property should be separate test case
-        // literal() will instead continue until string delimiter is hit, or
-        //  !istream.good()
-        reset_istringstream(iss, "\"tes\\t\"");
+        reset_istringstream(iss, "\"tes\\x7f\"");
         s.clear();
         iss >> strings::literal(s);
-        REQUIRE(s == "tes\t");
+        REQUIRE(s == "tes\x7f");
     }
 
     SECTION("Chars and STL strings inside supported containers parsed as "
@@ -528,20 +547,116 @@ TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
         REQUIRE(sv == std::vector<std::string> { { "tes\t" } });
     }
 
+    SECTION("Parsing of strings as literals continues until trailing delimiter "
+            "or failure, regardless of whitespace characters extracted")
+    {
+        std::string s;
+        reset_istringstream(iss, "tes\t");
+        iss >> std::noskipws >> s >> std::skipws;
+        REQUIRE(s == "tes");
+
+        reset_istringstream(iss, "\"tes\\t\"");
+        s.clear();
+        iss >> strings::literal(s);
+        REQUIRE(s == "tes\t");
+
+        reset_istringstream(iss, "[\"tes\\t\"]");
+        std::vector<std::string> v;
+        s.clear();
+        iss >> v;
+        REQUIRE(v[0] == "tes\t");
+    }
+
     SECTION("Default behavior of parsing chars/STL strings inside supported "
             "containers can be set with I/O manipulator literalrepr")
     {
+        // default
+        reset_istringstream(iss, "['t', 'e', 's', '\\t', '\\x7f']");
+        std::vector<char> cv1;
+        iss >> cv1;
+        REQUIRE(cv1 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
+
+        reset_istringstream(iss, "[\"tes\\t\"]");
+        std::vector<std::string> sv1;
+        iss >> sv1;
+        REQUIRE(sv1 == std::vector<std::string>{ { "tes\t" } });
+
+        // change from default
+        iss >> strings::quotedrepr;
+
+        reset_istringstream(iss, "['t', 'e', 's', '\t', '\x7f']");
+        std::vector<char> cv2;
+        iss >> cv2;
+        REQUIRE(cv2 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
+
+        reset_istringstream(iss, "[\"tes\t\"]");
+        std::vector<std::string> sv2;
+        iss >> sv2;
+        REQUIRE(sv2 == std::vector<std::string>{ { "tes\t" } });
+
+        // reset to default
+        iss >> strings::literalrepr;
+
+        reset_istringstream(iss, "['t', 'e', 's', '\\t', '\\x7f']");
+        std::vector<char> cv3;
+        iss >> cv3;
+        REQUIRE(cv3 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
+
+        reset_istringstream(iss, "[\"tes\\t\"]");
+        std::vector<std::string> sv3;
+        iss >> sv3;
+        REQUIRE(sv3 == std::vector<std::string>{ { "tes\t" } });
     }
 
     SECTION("With different stream and element char types, literal representation "
             "hex escapes all chars")
     {
+        reset_istringstream(iss,
+            "L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\\xffffffff\"");
+        std::wstring ws;
+        iss >> strings::literal(ws);
+        REQUIRE(ws == L"t\\\"\t\x7f\xffffffff");
+
+        reset_istringstream(iss,
+            "[L\"\\x00000074\\x0000005c\\x00000022\\x00000009\\x0000007f\\xffffffff\"]");
+        std::vector<std::wstring> wsv;
+        iss >> wsv;
+        REQUIRE(wsv == std::vector<std::wstring>{ { L"t\\\"\t\x7f\xffffffff" } });
+
+        reset_istringstream(wiss, L"\"\\x74\\x5c\\x22\\x09\\x7f\\xff\"");
+        std::string s;
+        wiss >> strings::literal(s);
+        REQUIRE(s == "t\\\"\t\x7f\xff");
+
+        reset_istringstream(wiss, L"[\"\\x74\\x5c\\x22\\x09\\x7f\\xff\"]");
+        std::vector<std::string> sv;
+        wiss >> sv;
+        REQUIRE(sv == std::vector<std::string>{ { "t\\\"\t\x7f\xff" } });
     }
 
     SECTION("With same stream and element char types, literal representation "
             "escapes the delimiter, escape, and standard ASCII-7 escaped chars, "
-            "hex escaping all other unprintable ASCII-7")
+            "hex escaping all other unprintable ASCII-7 or values beyond 7-bit max")
     {
+        reset_istringstream(iss, "\"t\\\\\\\"\\t\\x7f\\xff\"");
+        std::string s;
+        iss >> strings::literal(s);
+        REQUIRE(s == "t\\\"\t\x7f\xff");
+
+        reset_istringstream(iss, "[\"t\\\\\\\"\\t\\x7f\\xff\"]");
+        std::vector<std::string> sv;
+        iss >> sv;
+        REQUIRE(sv == std::vector<std::string>{ { "t\\\"\t\x7f\xff" } });
+
+        reset_istringstream(wiss, L"L\"t\\\\\\\"\\t\\x0000007f\\xffffffff\"");
+        std::wstring ws;
+        wiss >> strings::literal(ws);
+        REQUIRE(ws == L"t\\\"\t\x7f\xffffffff");
+
+        reset_istringstream(wiss, L"[L\"t\\\\\\\"\\t\\x0000007f\\xffffffff\"]");
+        std::vector<std::wstring> wsv;
+        wiss >> wsv;
+        REQUIRE(wsv == std::vector<std::wstring>{ { L"t\\\"\t\x7f\xffffffff" } });
     }
 }
 
@@ -590,8 +705,13 @@ TEST_CASE("Strings: parsing chars/STL strings as quoted strings",
     {
     }
 
+    SECTION("Parsing of strings as literals continues until trailing delimiter "
+            "or failure, regardless of whitespace characters extracted")
+    {
+    }
+
     SECTION("Default behavior of parsing chars/STL strings inside supported containers "
-        " can be set with I/O manipulator quotedrepr")
+            " can be set with I/O manipulator quotedrepr")
     {
     }
 
