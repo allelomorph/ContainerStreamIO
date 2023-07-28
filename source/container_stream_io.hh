@@ -553,7 +553,7 @@ struct string_repr
 {
     static_assert(std::is_pointer<StringType>::value ||
                   std::is_reference<StringType>::value,
-                  "String type must be a char, pointer or reference");
+                  "String type must be a pointer or reference");
 
     StringType string;
     CharacterType delim;
@@ -658,7 +658,7 @@ static void insert_escaped_char(
             os << StreamCharType('x') <<
                 std::hex << std::setfill(StreamCharType('0')) <<
                 std::setw(2 * sizeof(StringCharType)) <<
-                (hex_mask & static_cast<unsigned int>(c));
+                (hex_mask & static_cast<uint32_t>(c));
         }
     }
     else
@@ -860,9 +860,9 @@ auto operator>>(
     const string_repr<StringCharType&, StringCharType>& repr
     ) -> std::basic_istream<StreamCharType>&
 {
+    std::basic_string<StringCharType> temp;
     string_repr<std::basic_string<StringCharType>&, StringCharType> temp_repr {
-        std::basic_string<StringCharType>{},
-        repr.delim, repr.escape, repr.type };
+        temp, repr.delim, repr.escape, repr.type };
     extract_string_repr(istream, temp_repr);
     if (!istream.fail() && temp_repr.string.size() == 1)
         repr.string = temp_repr.string[0];
