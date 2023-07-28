@@ -970,6 +970,18 @@ inline auto quoted(
         std::basic_string_view<CharType, TraitsType>&, CharType>(
 	    string_view, delim, escape, detail::repr_type::quoted);
 }
+
+template<typename CharType, typename TraitsType>
+inline auto quoted(
+    const std::basic_string_view<CharType, TraitsType>& string_view,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<
+        const std::basic_string_view<CharType, TraitsType>&, CharType>
+{
+    return detail::string_repr<
+        const std::basic_string_view<CharType, TraitsType>&, CharType>(
+	    string_view, delim, escape, detail::repr_type::quoted);
+}
 #endif  // C++17
 
 template<typename CharType>
@@ -1041,6 +1053,18 @@ inline auto literal(
 {
     return detail::string_repr<
         std::basic_string_view<CharType, TraitsType>&, CharType>(
+	    string_view, delim, escape, detail::repr_type::literal);
+}
+
+template<typename CharType, typename TraitsType>
+inline auto literal(
+    const std::basic_string_view<CharType, TraitsType>& string_view,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<
+        const std::basic_string_view<CharType, TraitsType>&, CharType>
+{
+    return detail::string_repr<
+        const std::basic_string_view<CharType, TraitsType>&, CharType>(
 	    string_view, delim, escape, detail::repr_type::literal);
 }
 #endif  // C++17
