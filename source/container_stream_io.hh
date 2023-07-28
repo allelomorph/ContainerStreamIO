@@ -1179,22 +1179,19 @@ struct default_formatter
         extract_token(istream, decorators.prefix);
     }
 
-    template<typename ElementType, typename CharType>
-    static auto parse_element(
-        StreamType& istream, ElementType& element
+    template<typename ElementType>
+    static auto parse_element(StreamType& istream, ElementType& element
         ) noexcept -> std::enable_if_t<
-            !traits::is_char_variant<ElementType>::value &&
-            !std::is_same<ElementType, std::basic_string<CharType>>::value,
+            !traits::is_char_variant<ElementType>::value,
             void>
     {
         istream >> std::ws >> element;
     }
 
-    template<typename ElementType, typename CharType>
+    template<typename ElementType>
     static auto parse_element(StreamType& istream, ElementType& element
         ) noexcept -> std::enable_if_t<
-            traits::is_char_variant<ElementType>::value ||
-            std::is_same<ElementType, std::basic_string<CharType>>::value,
+            traits::is_char_variant<ElementType>::value,
             void>
     {
         if (static_cast<repr_type>(
@@ -1204,6 +1201,22 @@ struct default_formatter
             istream >> std::ws >> strings::literal(element);
     }
 
+    template<typename CharType>
+    static void parse_element(StreamType& istream,
+                              std::basic_string<CharType>& element)
+    {
+        if (static_cast<repr_type>(
+                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
+            istream >> std::ws >> strings::quoted(element);
+        else
+            istream >> std::ws >> strings::literal(element);
+    }
+
+    // TBD std::cin >> charT[n] works, but with stack smashing on buffer overrun,
+    //   std::cin >> charT* works, but with segfault on nullptr or buffer overrun -
+    //   should this overload and one for charT* be allowed? If so, support for
+    //   charT[n] and char* should be moved into quoted()/literal(), to make for
+    //   consistent formatting inside and outside supported containers.
     template <typename CharType, std::size_t ArraySize>
     static auto parse_element(
         StreamType& istream, CharType (&element)[ArraySize]
