@@ -164,6 +164,15 @@ struct is_parseable_as_container<
     : public std::false_type
 {};
 
+// string_view should fail to meet default specialization
+// #if (__cplusplus >= 201703L)
+// template <typename CharacterType>
+// struct is_printable_as_container<
+//     std::basic_string_view<CharacterType>>
+//     : public std::false_type
+// {};
+// #endif
+
 #ifdef __cpp_variable_templates
 /**
  * @brief Helper variable template.
@@ -238,6 +247,14 @@ struct is_printable_as_container<
     std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>>
     : public std::false_type
 {};
+
+#if (__cplusplus >= 201703L)
+template <typename CharacterType>
+struct is_printable_as_container<
+    std::basic_string_view<CharacterType>>
+    : public std::false_type
+{};
+#endif
 
 #ifdef __cpp_variable_templates
 /**
