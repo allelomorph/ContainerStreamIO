@@ -794,6 +794,16 @@ void extract_string_repr(
     std::basic_istream<StreamCharType>& istream,
     const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr)
 {
+    // quoted encoding expects full potential range of StreamCharType values,
+    //   and so could create overflow if casting to a smaller StringCharType,
+    //   whereas literal encoding expects only printable 7-bit ASCII values due
+    //   to escapes
+    if (sizeof(StreamCharType) > sizeof(StringCharType) &&
+        repr.type != repr_type::literal)
+    {
+        istream.setstate(std::ios_base::failbit);
+        return;
+    }
     // !!? can we pass only StringCharType to template?
     extract_literal_prefix<StreamCharType, StringCharType>(istream);
     if (!istream.good())
@@ -808,7 +818,18 @@ void extract_string_repr(
     std::ios_base::fmtflags orig_flags {
         istream.flags(istream.flags() & ~std::ios_base::skipws) };
     for (istream >> c;
-         istream.good() && c != StreamCharType(repr.delim); istream >> c) {
+         istream.good() && c != StreamCharType(repr.delim); istream >> c)
+    {
+        if (c > 0x7f || !std::isprint(c))
+        {
+            if (repr.type == repr_type::quoted)
+            {
+                temp += StringCharType(c);
+                continue;
+            }
+            istream.setstate(std::ios_base::failbit);  // invalid literal encoding
+            break;
+        }
         if (c != StreamCharType(repr.escape))
         {
             temp += StringCharType(c);
@@ -817,42 +838,41 @@ void extract_string_repr(
         istream >> c;
         if (!istream.good())
             break;
-        if (c == StreamCharType(repr.escape) ||
-            c == StreamCharType(repr.delim))
+        if (c == StreamCharType(repr.escape) || c == StreamCharType(repr.delim))
         {
             temp += StringCharType(c);
             continue;
         }
-        if (!std::is_same<StringCharType, StreamCharType>::value ||
-              repr.type == repr_type::literal)
+        if (repr.type != repr_type::literal)  // invalid quoted escape
         {
-            // '\?' -> '?' omitted from ascii_escapes as it is only relevant
-            //   during istream extraction
-            if (c == StreamCharType('?'))
-            {
-                temp += StringCharType(c);
-                continue;
-            }
-            auto esc_it {std::find_if(
-                    repr.escape_seqs.begin(), repr.escape_seqs.end(),
-                    [&c](const escape_seq<StringCharType>& seq){
-                        return StreamCharType(seq.symbol) == c; })};
-            if (esc_it != repr.escape_seqs.end())  // standard escape sequence
-            {
-                temp += esc_it->actual;
-                continue;
-            }
-            else if (c == StreamCharType('x')) // custom hex escape sequence
-            {
-                // !!? can we pass only StringCharType to template?
-                temp += StringCharType(
-                    extract_fixed_width_hex_value<
-                    StreamCharType, StringCharType>(istream));
-                continue;
-            }
+            istream.setstate(std::ios_base::failbit);
+            break;
         }
-        // invalid escape
-        istream.setstate(std::ios_base::failbit);
+        auto esc_it {std::find_if(
+                repr.escape_seqs.begin(), repr.escape_seqs.end(),
+                [&c](const escape_seq<StringCharType>& seq){
+                    return StreamCharType(seq.symbol) == c; })};
+        if (esc_it != repr.escape_seqs.end())  // standard escape sequence
+        {
+            temp += esc_it->actual;
+            continue;
+        }
+        // '\?' -> '?' omitted from ascii_escapes as it is only relevant
+        //   during istream extraction
+        if (c == StreamCharType('?'))
+        {
+            temp += StringCharType(c);
+            continue;
+        }
+        if (c == StreamCharType('x')) // hex escape sequence
+        {
+            // !!? can we pass only StringCharType to template?
+            temp += StringCharType(
+                extract_fixed_width_hex_value<
+                StreamCharType, StringCharType>(istream));
+            continue;
+        }
+        istream.setstate(std::ios_base::failbit);  // invalid literal escape
     };
     if (c != StreamCharType(repr.delim))
         istream.setstate(std::ios_base::failbit);
