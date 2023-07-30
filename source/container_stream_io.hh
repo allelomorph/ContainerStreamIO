@@ -550,9 +550,10 @@ struct ascii_escape
         {
             {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
             {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
-            // \', \", and \\ handled by choosing custom delim/escape chars per task
-            // \? only extracted into ? by operator>>(string_repr)
-            // trigraphs ignored for now, see:
+            // \', \", and \\ handled by choosing custom delim/escape chars
+            // legacy C trigraphs ignored for now, but "\?" extracted into '?'
+            //   by extract_string_repr, see:
+            //   - https://en.cppreference.com/w/cpp/language/escape
             //   - https://en.cppreference.com/w/c/language/operator_alternative
         }
     };
@@ -657,7 +658,7 @@ static void insert_escaped_char(
     const bool same_char_type { std::is_same<StringCharType, StreamCharType>::value };
     // string_repr ctor enforces ASCII-printable delim and escape
     if (!same_char_type ||
-        (repr.type == repr_type::literal && c <= 0x7f && !std::isprint(c)))
+        (repr.type == repr_type::literal && (c > 0x7f || !std::isprint(c))))
     {
         os << StreamCharType(repr.escape);
         auto esc_it { std::find_if(
@@ -848,6 +849,14 @@ void extract_string_repr(
             istream.setstate(std::ios_base::failbit);
             break;
         }
+        // legacy C trigraphs ignored for now, but "\?" extracted into '?', see:
+        //   - https://en.cppreference.com/w/cpp/language/escape
+        //   - https://en.cppreference.com/w/c/language/operator_alternative
+        if (c == StreamCharType('?'))
+        {
+            temp += StringCharType(c);
+            continue;
+        }
         auto esc_it {std::find_if(
                 repr.escape_seqs.begin(), repr.escape_seqs.end(),
                 [&c](const escape_seq<StringCharType>& seq){
@@ -855,13 +864,6 @@ void extract_string_repr(
         if (esc_it != repr.escape_seqs.end())  // standard escape sequence
         {
             temp += esc_it->actual;
-            continue;
-        }
-        // '\?' -> '?' omitted from ascii_escapes as it is only relevant
-        //   during istream extraction
-        if (c == StreamCharType('?'))
-        {
-            temp += StringCharType(c);
             continue;
         }
         if (c == StreamCharType('x')) // hex escape sequence
