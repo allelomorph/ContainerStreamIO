@@ -551,8 +551,7 @@ struct ascii_escape
             {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
             {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
             // \', \", and \\ handled by choosing custom delim/escape chars
-            // legacy C trigraphs ignored for now, but "\?" extracted into '?'
-            //   by extract_string_repr, see:
+            // legacy C trigraphs and "\?" -> '?' escaping ignored for now, see:
             //   - https://en.cppreference.com/w/cpp/language/escape
             //   - https://en.cppreference.com/w/c/language/operator_alternative
         }
@@ -848,14 +847,6 @@ void extract_string_repr(
         {
             istream.setstate(std::ios_base::failbit);
             break;
-        }
-        // legacy C trigraphs ignored for now, but "\?" extracted into '?', see:
-        //   - https://en.cppreference.com/w/cpp/language/escape
-        //   - https://en.cppreference.com/w/c/language/operator_alternative
-        if (c == StreamCharType('?'))
-        {
-            temp += StringCharType(c);
-            continue;
         }
         auto esc_it {std::find_if(
                 repr.escape_seqs.begin(), repr.escape_seqs.end(),
