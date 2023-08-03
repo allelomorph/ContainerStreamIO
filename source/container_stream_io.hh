@@ -5,6 +5,7 @@
 // #include <cstddef>    // size_t
 #include <iostream>
 #include <set>
+#include <map>
 #include <string>
 #include <tuple>
 #include <forward_list>
@@ -30,6 +31,10 @@ using decay_t = typename decay<T>::type;
 // No feature test macro found for enable_if_t.
 template< bool B, class T = void >
 using enable_if_t = typename enable_if<B,T>::type;
+
+// No feature test macro found for remove_const_t.
+template< class T >
+using remove_const_t = typename remove_const<T>::type;
 
 // Use of variable template is_(parse/print)able_as_container_v below ellided by
 //   testing for feature test macro __cpp_variable_templates.
@@ -411,6 +416,7 @@ constexpr auto string_literal(
 
 #else // __cplusplus < 201703L
 
+// TBD make char_ and string_literal inline?
 // full template specialization appropriate
 template<typename CharType>
 constexpr CharType char_literal(
@@ -524,91 +530,38 @@ constexpr auto string_literal(
 
 } // namespace compile_time
 
-namespace detail {
-
-// labels for flag values used to set string representation type
-// literal = all unprintable char values escaped, as if string literal - default
-// quoted = only delimiter (eg '"') and escape (eg '\\') escaped, others printed even if skipped
-enum class repr_type { literal, quoted };
-
-template<typename CharacterType>
-struct escape_seq
-{
-    CharacterType actual;
-    CharacterType symbol;
-};
-
-// given char and wchar_t share the same set of standard escapes, and
-//   Unicode code points below 0x7f map to 7-bit ASCII, escapes treated the
-//   same for all char types
-// wrapping in struct to avoid variable template use for C++11 compliance
-template<typename CharacterType>
-struct ascii_escape
-{
-    static constexpr std::array<escape_seq<CharacterType>, 8> seqs
-    {
-        {
-            {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
-            {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
-            // \', \", and \\ handled by choosing custom delim/escape chars
-            // legacy C trigraphs and "\?" -> '?' escaping ignored for now, see:
-            //   - https://en.cppreference.com/w/cpp/language/escape
-            //   - https://en.cppreference.com/w/c/language/operator_alternative
-        }
-    };
-};
-
 // quoted/literal implementation (string_repr, operator<</>>(string_repr),
 //   quoted(), literal()) based on glibc C++14 std::quoted (as seen in iomanip
 //   and bits/quoted_string.h headers;) redone here to add features and allow
 //   use in C++11
-/**
- * @brief Struct for string literal representations.
- */
-template<typename StringType, typename CharacterType>
-struct string_repr
-{
-    static_assert(std::is_pointer<StringType>::value ||
-                  std::is_reference<StringType>::value,
-                  "String type must be a pointer or reference");
 
-    StringType string;
-    CharacterType delim;
-    CharacterType escape;
-    repr_type type;
+namespace detail {
 
-    // !!? why does using decltype over auto here prevent the "has no
-    //   initializer" error with the outside declaration?
-    // using array instead of map due to small, fixed set of keys, and
-    //   need to lookup by both actual and symbol
-    static constexpr decltype(ascii_escape<CharacterType>::seqs) escape_seqs {
-        ascii_escape<CharacterType>::seqs };
+// quoted encoding:
+// - only delim/escape escaped
+// - can choose any, even non-ascii, delim/escape
+// - only enabled if sizeof(StreamCharType) >= sizeof(StringCharType), as
+//     non-delim/escape chars passed directly
 
-    string_repr() = delete;
-    string_repr(const StringType str, const CharacterType dlm,
-                const CharacterType esc, const repr_type t)
-	: string(str), delim{dlm}, escape{esc}, type{t}
-    {
-        if (dlm > 0x7f || !std::isprint(dlm) ||
-            esc > 0x7f || !std::isprint(esc))
-            throw(std::invalid_argument(
-                      "delim and escape must be printable ASCII characters"));
-    }
+// literal encoding:
+// - limited to printable ascii via:
+//   - only printable ascii delim/escape
+//   - delim/escape escaped
+//   - standard unprintable ascii escape seqs
+//   - other unprintable ascii hex escaped
+//   - values beyond 7-bit range (0x7f) escaped
+// - enabled for any combo of string and stream char type
 
-    string_repr& operator=(string_repr&) = delete;
-};
+// quoted decoding:
+// - only enabled if sizeof(StreamCharType) <= sizeof(StringCharType), as
+//     non-delim/escape chars passed directly
 
-// linker needs declaration of static constexpr members outside class for
-//   standards below C++17, see:
-//   - https://en.cppreference.com/w/cpp/language/static
-//   - https://stackoverflow.com/a/28846608
-#if (__cplusplus < 201703L)
+// literal decoding:
+// - enabled for any combo of string and stream char type, but failbit will be
+//     set by hex widths beyond sizeof(StringCharType)
 
-template<typename StringType, typename CharacterType>
-constexpr decltype(ascii_escape<CharacterType>::seqs) string_repr<
-    StringType, CharacterType>::escape_seqs;
-
-#endif  // pre-C++17
+// labels for flag values used to set string representation type
+enum class repr_type { literal, quoted };
 
 // stream index getter for use with iword/pword to set literalrepr/quotedrepr
 static inline int get_manip_i()
@@ -616,6 +569,83 @@ static inline int get_manip_i()
     static int i {std::ios_base::xalloc()};
     return i;
 }
+
+template<typename StringType, typename CharType>
+struct string_repr
+{
+private:
+    // given char and wchar_t share the same set of standard escapes, and
+    //   Unicode code points below 0x7f map to 7-bit ASCII, escapes treated the
+    //   same for all char types
+    // wrapping in struct to avoid variable template use for C++11 compliance
+    struct ascii_escapes
+    {
+        static std::map<CharType, CharType> by_value;
+        static std::map<CharType, CharType> by_symbol;
+    };
+
+public:
+    // TBD change to SFINAE with enable_if
+    static_assert(std::is_pointer<StringType>::value ||
+                  std::is_reference<StringType>::value,
+                  "String type must be a pointer or reference");
+
+    StringType string;
+    CharType delim;
+    CharType escape;
+    repr_type type;
+
+    static constexpr ascii_escapes escapes {};
+
+    string_repr() = delete;
+    string_repr(const StringType str, const CharType dlm,
+                const CharType esc, const repr_type typ) :
+        string{str}, delim{dlm}, escape{esc}, type{typ}
+    {
+        if (type == repr_type::literal &&
+            (dlm > 0x7f || !std::isprint(dlm) ||
+             esc > 0x7f || !std::isprint(esc)))
+            throw(std::invalid_argument(
+                      "literal delim and escape must be printable 7-bit ASCII characters"));
+    }
+
+    string_repr& operator=(string_repr&) = delete;
+};
+
+#if (__cplusplus < 201703L)
+
+// linker needs declaration of static constexpr members outside class for
+//   standards below C++17, see:
+//   - https://en.cppreference.com/w/cpp/language/static
+//   - https://stackoverflow.com/a/28846608
+template<typename StringType, typename CharType>
+constexpr typename string_repr<StringType, CharType>::ascii_escapes string_repr<StringType, CharType>::escapes;
+
+#endif  // pre-C++17
+
+// non-literal (std::map has non-trivial dtor) static members must be
+//   initialized outside class definition (per gcc)
+// \', \", and \\ handled by choosing custom delim/escape chars
+// legacy C trigraphs and "\?" -> '?' escaping ignored for now, see:
+//   - https://en.cppreference.com/w/cpp/language/escape
+//   - https://en.cppreference.com/w/c/language/operator_alternative
+template<typename StringType, typename CharType>
+std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::by_value
+{
+    {
+        {'\a', 'a'}, {'\b', 'b'}, {'\f', 'f'}, {'\n', 'n'},
+        {'\r', 'r'}, {'\t', 't'}, {'\v', 'v'}, {'\0', '0'}
+    }
+};
+
+template<typename StringType, typename CharType>
+std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::by_symbol
+{
+    {
+        {'a', '\a'}, {'b', '\b'}, {'f', '\f'}, {'n', '\n'},
+        {'r', '\r'}, {'t', '\t'}, {'v', '\v'}, {'0', '\0'}
+    }
+};
 
 // insert_literal_prefix and insert_escaped_char help to shorten
 //   operator<<(string_repr) overload definitions
@@ -636,13 +666,6 @@ static void insert_literal_prefix(
         os << CHAR_LITERAL(StreamCharType, 'U');
 }
 
-
-// stream and string char types differ
-//     hex escape all
-// stream and string char types same
-//     quoted - escape delim, escape
-//     literal - escape delim, escape, escape seqs; hex escape other non-printable ASCII-7
-// TBD revise to always stream ascii-7 code points the same regardless of types
 template<typename StreamCharType, typename StringType, typename StringCharType>
 static void insert_escaped_char(
     std::basic_ostream<StreamCharType>& os,
@@ -654,23 +677,19 @@ static void insert_escaped_char(
         (sizeof(StringCharType) == 2) ? 0xffff :
                                         0xffffffff };
 
-    const bool same_char_type { std::is_same<StringCharType, StreamCharType>::value };
-    // string_repr ctor enforces ASCII-printable delim and escape
-    if (!same_char_type ||
-        (repr.type == repr_type::literal && (c > 0x7f || !std::isprint(c))))
+    if (c < 0x7f && std::isprint(c))
+    {
+        // literal_repr ctor enforces ASCII-printable delim and escape
+        if (c == repr.delim || c == repr.escape)
+            os << StreamCharType(repr.escape);
+        os << StreamCharType(c);
+    }
+    else
     {
         os << StreamCharType(repr.escape);
-        auto esc_it { std::find_if(
-                repr.escape_seqs.begin(), repr.escape_seqs.end(),
-                [&c](const escape_seq<StringCharType>& seq){
-                    return seq.actual == c; }) };
-        if (same_char_type && esc_it != repr.escape_seqs.end())
-        {
-            // standard escape sequence
-            os << StreamCharType(esc_it->symbol);
-        }
-        else
-        {
+        try {
+            os << StreamCharType(repr.escapes.by_value.at(c));
+        } catch (const std::out_of_range& /*oor_ex*/) {
             // custom hex escape sequence
             os << StreamCharType('x') <<
                 std::hex << std::setfill(StreamCharType('0')) <<
@@ -678,46 +697,138 @@ static void insert_escaped_char(
                 (hex_mask & static_cast<uint32_t>(c));
         }
     }
-    else
-    {
-        if (c == repr.delim || c == repr.escape)
-            os << StreamCharType(repr.escape);
-        os << StreamCharType(c);
-    }
 }
 
-template<typename StreamCharType, typename StringType, typename StringCharType>
+// TBD maybe throw exeception rather than set failbit on quoted char size failure?
+
+// template<typename StreamCharType, typename StringType, typename StringCharType>
+// auto operator<<(
+//     std::basic_ostream<StreamCharType>& ostream,
+//     const string_repr<StringType, StringCharType>& repr
+//     ) -> std::enable_if_t<
+//         std::is_same<StringType, StringCharType&>::value ||
+//         std::is_same<StringType, const StringCharType&>::value,
+//         std::basic_ostream<StreamCharType>&>
+// {
+//     if (repr.type == repr_type::quoted &&
+//         sizeof(StreamCharType) > sizeof(StringCharType))
+//     {
+//         ostream.setstate(std::ios_base::failbit);
+//         return ostream;
+//     }
+//     std::basic_ostringstream<StreamCharType> oss;
+//     insert_literal_prefix<StreamCharType, StringCharType>(oss);
+//     oss << StreamCharType(repr.delim);
+//     insert_escaped_char(oss, repr, repr.string);
+//     oss << StreamCharType(repr.delim);
+//     return ostream << oss.str();
+// }
+
+template<typename StreamCharType, typename StringCharType>
 auto operator<<(
     std::basic_ostream<StreamCharType>& ostream,
-    const string_repr<StringType, StringCharType>& repr
-    ) -> std::enable_if_t<
-        std::is_same<StringType, StringCharType&>::value ||
-        std::is_same<StringType, const StringCharType&>::value,
-        std::basic_ostream<StreamCharType>&>
+    const string_repr<StringCharType&, StringCharType>& repr
+    ) -> std::basic_ostream<StreamCharType>&
 {
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
     std::basic_ostringstream<StreamCharType> oss;
     insert_literal_prefix<StreamCharType, StringCharType>(oss);
     oss << StreamCharType(repr.delim);
-    insert_escaped_char(oss, repr, repr.string);
+    if (repr.type == repr_type::quoted)
+    {
+        if (repr.string == repr.delim || repr.string == repr.escape)
+            oss << StreamCharType(repr.escape);
+        oss << StreamCharType(repr.string);
+    }
+    else
+        insert_escaped_char(oss, repr, repr.string);
     oss << StreamCharType(repr.delim);
     return ostream << oss.str();
 }
 
-template<typename StreamCharType, typename StringType, typename StringCharType>
+template<typename StreamCharType, typename StringCharType>
 auto operator<<(
     std::basic_ostream<StreamCharType>& ostream,
-    const string_repr<StringType, StringCharType>& repr
-    ) -> std::enable_if_t<
-        !std::is_same<StringType, StringCharType&>::value &&
-        !std::is_same<StringType, const StringCharType&>::value,
-        std::basic_ostream<StreamCharType>&>
+    const string_repr<const StringCharType&, StringCharType>& repr
+    ) -> std::basic_ostream<StreamCharType>&
 {
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
     std::basic_ostringstream<StreamCharType> oss;
     insert_literal_prefix<StreamCharType, StringCharType>(oss);
     oss << StreamCharType(repr.delim);
-    for (const auto c : repr.string)
+    if (repr.type == repr_type::quoted)
     {
-        insert_escaped_char(oss, repr, c);
+        if (repr.string == repr.delim || repr.string == repr.escape)
+            oss << StreamCharType(repr.escape);
+        oss << StreamCharType(repr.string);
+    }
+    else
+        insert_escaped_char(oss, repr, repr.string);
+    oss << StreamCharType(repr.delim);
+    return ostream << oss.str();
+}
+
+// template<typename StreamCharType, typename StringCharType>
+// auto operator<<(
+//     std::basic_ostream<StreamCharType>& ostream,
+//     const string_repr<const StringCharType*, StringCharType>& repr
+//     ) -> std::basic_ostream<StreamCharType>&
+// {
+//     if (repr.type == repr_type::quoted &&
+//         sizeof(StreamCharType) < sizeof(StringCharType))
+//     {
+//         ostream.setstate(std::ios_base::failbit);
+//         return ostream;
+//     }
+//     std::basic_ostringstream<StreamCharType> oss;
+//     insert_literal_prefix<StreamCharType, StringCharType>(oss);
+//     oss << StreamCharType(repr.delim);
+//     for (auto p { repr.string }; *p; ++p)
+//     {
+//         insert_escaped_char(oss, repr, *p);
+//     }
+//     oss << StreamCharType(repr.delim);
+//     return ostream << oss.str();
+// }
+
+template<typename StreamCharType, typename StringCharType>
+auto operator<<(
+    std::basic_ostream<StreamCharType>& ostream,
+    const string_repr<StringCharType*, StringCharType>& repr
+    ) -> std::basic_ostream<StreamCharType>&
+{
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
+    std::basic_ostringstream<StreamCharType> oss;
+    insert_literal_prefix<StreamCharType, StringCharType>(oss);
+    oss << StreamCharType(repr.delim);
+    if (repr.type == repr_type::quoted)
+    {
+        for (auto p { repr.string }; *p; ++p)
+        {
+            if (*p == repr.delim || *p == repr.escape)
+                oss << StreamCharType(repr.escape);
+            oss << StreamCharType(*p);
+        }
+    }
+    else
+    {
+        for (auto p { repr.string }; *p; ++p)
+            insert_escaped_char(oss, repr, *p);
     }
     oss << StreamCharType(repr.delim);
     return ostream << oss.str();
@@ -729,12 +840,87 @@ auto operator<<(
     const string_repr<const StringCharType*, StringCharType>& repr
     ) -> std::basic_ostream<StreamCharType>&
 {
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
     std::basic_ostringstream<StreamCharType> oss;
     insert_literal_prefix<StreamCharType, StringCharType>(oss);
     oss << StreamCharType(repr.delim);
-    for (auto p { repr.string }; *p; ++p)
+    if (repr.type == repr_type::quoted)
     {
-        insert_escaped_char(oss, repr, *p);
+        for (auto p { repr.string }; *p; ++p)
+        {
+            if (*p == repr.delim || *p == repr.escape)
+                oss << StreamCharType(repr.escape);
+            oss << StreamCharType(*p);
+        }
+    }
+    else
+    {
+        for (auto p { repr.string }; *p; ++p)
+            insert_escaped_char(oss, repr, *p);
+    }
+    oss << StreamCharType(repr.delim);
+    return ostream << oss.str();
+}
+
+// template<typename StreamCharType, typename StringType, typename StringCharType>
+// auto operator<<(
+//     std::basic_ostream<StreamCharType>& ostream,
+//     const string_repr<StringType, StringCharType>& repr
+//     ) -> std::enable_if_t<
+//         !std::is_same<StringType, StringCharType&>::value &&
+//         !std::is_same<StringType, const StringCharType&>::value,
+//         std::basic_ostream<StreamCharType>&>
+// {
+//     if (repr.type == repr_type::quoted &&
+//         sizeof(StreamCharType) < sizeof(StringCharType))
+//     {
+//         ostream.setstate(std::ios_base::failbit);
+//         return ostream;
+//     }
+//     std::basic_ostringstream<StreamCharType> oss;
+//     insert_literal_prefix<StreamCharType, StringCharType>(oss);
+//     oss << StreamCharType(repr.delim);
+//     for (const auto c : repr.string)
+//     {
+//         insert_escaped_char(oss, repr, c);
+//     }
+//     oss << StreamCharType(repr.delim);
+//     return ostream << oss.str();
+// }
+
+template<typename StreamCharType, typename StringType, typename StringCharType>
+auto operator<<(
+    std::basic_ostream<StreamCharType>& ostream,
+    const string_repr<StringType, StringCharType>& repr
+    ) -> std::basic_ostream<StreamCharType>&
+{
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
+    std::basic_ostringstream<StreamCharType> oss;
+    insert_literal_prefix<StreamCharType, StringCharType>(oss);
+    oss << StreamCharType(repr.delim);
+    if (repr.type == repr_type::quoted)
+    {
+        for (const auto c : repr.string)
+        {
+            if (c == repr.delim || c == repr.escape)
+                oss << StreamCharType(repr.escape);
+            oss << StreamCharType(c);
+        }
+    }
+    else
+    {
+        for (const auto c : repr.string)
+            insert_escaped_char(oss, repr, c);
     }
     oss << StreamCharType(repr.delim);
     return ostream << oss.str();
@@ -790,6 +976,92 @@ static int64_t extract_fixed_width_hex_value(
 }
 
 template<typename StreamCharType, typename StringCharType>
+void extract_quoted_repr(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr,
+    std::basic_string<StringCharType>& buffer)
+{
+    StreamCharType c;
+    std::ios_base::fmtflags orig_flags {
+        istream.flags(istream.flags() & ~std::ios_base::skipws) };
+    for (istream >> c;
+         istream.good() && c != StreamCharType(repr.delim); istream >> c)
+    {
+        if (c != StreamCharType(repr.escape))
+        {
+            buffer += StringCharType(c);
+            continue;
+        }
+        istream >> c;
+        if (istream.good())
+        {
+            if (c == StreamCharType(repr.escape) ||
+                c == StreamCharType(repr.delim))
+                buffer += StringCharType(c);
+            else
+               istream.setstate(std::ios_base::failbit);  // invalid quoted encoding
+        }
+    };
+    if (c != StreamCharType(repr.delim))
+        istream.setstate(std::ios_base::failbit);
+    istream.setf(orig_flags);
+}
+
+template<typename StreamCharType, typename StringCharType>
+void extract_literal_repr(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr,
+    std::basic_string<StringCharType>& buffer)
+{
+    StreamCharType c;
+    std::ios_base::fmtflags orig_flags {
+        istream.flags(istream.flags() & ~std::ios_base::skipws) };
+    for (istream >> c;
+         istream.good() && c != StreamCharType(repr.delim); istream >> c)
+    {
+        if (c < 0x7f && std::isprint(c))
+        {
+            if (c != StreamCharType(repr.escape))
+            {
+                buffer += StringCharType(c);
+                continue;
+            }
+            istream >> c;
+            if (c > 0x7f || !std::isprint(c))
+                istream.setstate(std::ios_base::failbit);  // invalid escape
+            if (!istream.good())
+                break;
+            if (c == StreamCharType(repr.escape) ||
+                c == StreamCharType(repr.delim))
+            {
+                buffer += StringCharType(c);
+                continue;
+            }
+            try
+            {
+                buffer += repr.escapes.by_symbol.at(c);
+                continue;
+            }
+            catch (const std::out_of_range& /*oor_ex*/)
+            {
+                if (c == StreamCharType('x'))
+                {
+                    // !!? can we pass only StringCharType to template?
+                    buffer += StringCharType(
+                        extract_fixed_width_hex_value<
+                        StreamCharType, StringCharType>(istream));
+                    continue;
+                }
+            }
+        }
+        istream.setstate(std::ios_base::failbit);  // invalid literal encoding
+    };
+    if (c != StreamCharType(repr.delim))
+        istream.setstate(std::ios_base::failbit);
+    istream.setf(orig_flags);
+}
+
+template<typename StreamCharType, typename StringCharType>
 void extract_string_repr(
     std::basic_istream<StreamCharType>& istream,
     const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr)
@@ -798,8 +1070,8 @@ void extract_string_repr(
     //   and so could create overflow if casting to a smaller StringCharType,
     //   whereas literal encoding expects only printable 7-bit ASCII values due
     //   to escapes
-    if (sizeof(StreamCharType) > sizeof(StringCharType) &&
-        repr.type != repr_type::literal)
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) > sizeof(StringCharType))
     {
         istream.setstate(std::ios_base::failbit);
         return;
@@ -808,80 +1080,18 @@ void extract_string_repr(
     extract_literal_prefix<StreamCharType, StringCharType>(istream);
     if (!istream.good())
         return;
-    StreamCharType c;
-    istream >> c;
-    if (c != StreamCharType(repr.delim))
+    // get() returns std::basic_istream<StreamCharType>::int_type
+    if (StreamCharType(istream.get()) != StreamCharType(repr.delim))
         istream.setstate(std::ios_base::failbit);
     if (!istream.good())
         return;
     std::basic_string<StringCharType> temp;
-    std::ios_base::fmtflags orig_flags {
-        istream.flags(istream.flags() & ~std::ios_base::skipws) };
-    for (istream >> c;
-         istream.good() && c != StreamCharType(repr.delim); istream >> c)
-    {
-        if (c > 0x7f || !std::isprint(c))
-        {
-            if (repr.type == repr_type::quoted)
-            {
-                temp += StringCharType(c);
-                continue;
-            }
-            istream.setstate(std::ios_base::failbit);  // invalid literal encoding
-            break;
-        }
-        if (c != StreamCharType(repr.escape))
-        {
-            temp += StringCharType(c);
-            continue;
-        }
-        istream >> c;
-        if (!istream.good())
-            break;
-        if (c == StreamCharType(repr.escape) || c == StreamCharType(repr.delim))
-        {
-            temp += StringCharType(c);
-            continue;
-        }
-        if (repr.type != repr_type::literal)  // invalid quoted escape
-        {
-            istream.setstate(std::ios_base::failbit);
-            break;
-        }
-        auto esc_it {std::find_if(
-                repr.escape_seqs.begin(), repr.escape_seqs.end(),
-                [&c](const escape_seq<StringCharType>& seq){
-                    return StreamCharType(seq.symbol) == c; })};
-        if (esc_it != repr.escape_seqs.end())  // standard escape sequence
-        {
-            temp += esc_it->actual;
-            continue;
-        }
-        if (c == StreamCharType('x')) // hex escape sequence
-        {
-            // !!? can we pass only StringCharType to template?
-            temp += StringCharType(
-                extract_fixed_width_hex_value<
-                StreamCharType, StringCharType>(istream));
-            continue;
-        }
-        istream.setstate(std::ios_base::failbit);  // invalid literal escape
-    };
-    if (c != StreamCharType(repr.delim))
-        istream.setstate(std::ios_base::failbit);
-    istream.setf(orig_flags);
-    if (!istream.fail() && !istream.bad())
+    if (repr.type == repr_type::quoted)
+        extract_quoted_repr(istream, repr, temp);
+    else
+        extract_literal_repr(istream, repr, temp);
+    if (istream.good())
         repr.string = std::move(temp);
-}
-
-template<typename StreamCharType, typename StringCharType>
-auto operator>>(
-    std::basic_istream<StreamCharType>& istream,
-    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr
-    ) -> std::basic_istream<StreamCharType>&
-{
-    extract_string_repr(istream, repr);
-    return istream;
 }
 
 template<typename StreamCharType, typename StringCharType>
@@ -898,6 +1108,16 @@ auto operator>>(
         repr.string = temp_repr.string[0];
     else
         istream.setstate(std::ios_base::failbit);
+    return istream;
+}
+
+template<typename StreamCharType, typename StringCharType>
+auto operator>>(
+    std::basic_istream<StreamCharType>& istream,
+    const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr
+    ) -> std::basic_istream<StreamCharType>&
+{
+    extract_string_repr(istream, repr);
     return istream;
 }
 
@@ -955,12 +1175,34 @@ inline auto quoted(
 
 template<typename CharType>
 inline auto quoted(
+    CharType* string,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<CharType*, CharType>
+{
+    return detail::string_repr<CharType*, CharType>(
+            string, delim, escape, detail::repr_type::quoted);
+}
+
+template<typename CharType>
+inline auto quoted(
     const CharType* string,
     CharType delim = CharType('"'), CharType escape = CharType('\\')
     ) -> detail::string_repr<const CharType*, CharType>
 {
     return detail::string_repr<const CharType*, CharType>(
             string, delim, escape, detail::repr_type::quoted);
+}
+
+template<typename CharType, typename TraitsType, typename AllocType>
+inline auto quoted(
+    std::basic_string<CharType, TraitsType, AllocType>& string,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<
+        std::basic_string<CharType, TraitsType, AllocType>&, CharType>
+{
+    return detail::string_repr<
+	std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
+	    string, delim, escape, detail::repr_type::quoted);
 }
 
 // note: using decltype(string) for string_repr<StringType, > fails to assign const reference
@@ -973,18 +1215,6 @@ inline auto quoted(
 {
     return detail::string_repr<
 	const std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
-	    string, delim, escape, detail::repr_type::quoted);
-}
-
-template<typename CharType, typename TraitsType, typename AllocType>
-inline auto quoted(
-    std::basic_string<CharType, TraitsType, AllocType>& string,
-    CharType delim = CharType('"'), CharType escape = CharType('\\')
-    ) -> detail::string_repr<
-        std::basic_string<CharType, TraitsType, AllocType>&, CharType>
-{
-    return detail::string_repr<
-	std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
 	    string, delim, escape, detail::repr_type::quoted);
 }
 
@@ -1040,12 +1270,34 @@ inline auto literal(
 
 template<typename CharType>
 inline auto literal(
+    CharType* string,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<CharType*, CharType>
+{
+    return detail::string_repr<CharType*, CharType>(
+            string, delim, escape, detail::repr_type::literal);
+}
+
+template<typename CharType>
+inline auto literal(
     const CharType* string,
     CharType delim = CharType('"'), CharType escape = CharType('\\')
     ) -> detail::string_repr<const CharType*, CharType>
 {
     return detail::string_repr<const CharType*, CharType>(
             string, delim, escape, detail::repr_type::literal);
+}
+
+template<typename CharType, typename TraitsType, typename AllocType>
+inline auto literal(
+    std::basic_string<CharType, TraitsType, AllocType>& string,
+    CharType delim = CharType('"'), CharType escape = CharType('\\')
+    ) -> detail::string_repr<
+        std::basic_string<CharType, TraitsType, AllocType>&, CharType>
+{
+    return detail::string_repr<
+	std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
+	    string, delim, escape, detail::repr_type::literal);
 }
 
 // note: using decltype(string) for string_repr<StringType, > fails to assign const reference
@@ -1058,18 +1310,6 @@ inline auto literal(
 {
     return detail::string_repr<
 	const std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
-	    string, delim, escape, detail::repr_type::literal);
-}
-
-template<typename CharType, typename TraitsType, typename AllocType>
-inline auto literal(
-    std::basic_string<CharType, TraitsType, AllocType>& string,
-    CharType delim = CharType('"'), CharType escape = CharType('\\')
-    ) -> detail::string_repr<
-        std::basic_string<CharType, TraitsType, AllocType>&, CharType>
-{
-    return detail::string_repr<
-	std::basic_string<CharType, TraitsType, AllocType>&, CharType>(
 	    string, delim, escape, detail::repr_type::literal);
 }
 
