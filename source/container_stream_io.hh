@@ -954,7 +954,7 @@ template<typename StreamCharType, typename StringCharType>
 static int64_t extract_fixed_width_hex_value(
     std::basic_istream<StreamCharType>& istream)
 {
-    constexpr uint32_t hex_length { sizeof(StringCharType) * 2 };
+    static constexpr uint32_t hex_length { sizeof(StringCharType) * 2 };
     char buff[hex_length + 1] {};
     // strtol expects char* and wcstol expects wchar_t*, which is variable size -
     //   in either case, we can't rely on implicit casting with something like
