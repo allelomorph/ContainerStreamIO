@@ -1924,7 +1924,7 @@ struct default_formatter
     }
 
     template<typename ElementType>
-    static auto print_element(StreamType& ostream, const ElementType element
+    static auto print_element(StreamType& ostream, const ElementType& element
         ) noexcept -> std::enable_if_t<
             traits::is_char_variant<ElementType>::value ||
             traits::is_string_variant<ElementType>::value,
