@@ -346,7 +346,8 @@ TEST_CASE("Traits: detect emplace methods", "[traits]")
 TEST_CASE("strings::literal() printing/output streaming escaped literals",
           "[literal][strings][output]")
 {
-    SECTION("supports parameter type", "(with example char type = char)")
+    SECTION("supports parameter type",
+            "(example parameter char type = char)")
     {
         std::ostringstream oss;
 
@@ -578,274 +579,259 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
     }
 }
 
-/*
-TEST_CASE("Strings: parsing chars/STL strings as escaped literals",
+TEST_CASE("strings::literal() parsing/input streaming escaped literals",
           "[literal][strings][input]")
 {
-
-    std::istringstream iss;
-
-    SECTION("Chars and STL strings outside supported containers can be parsed as "
-            "literals using literal()")
+    SECTION("supports parameter type",
+            "(example parameter char type = char)")
     {
+        std::istringstream iss;
+
+        SECTION("char&")
+        {
+            char c;
+            iss.str("'t'");
+            iss >> strings::literal(c);
+            REQUIRE(c == 't');
+        }
+
+        // TBD yet to implement
+        // SECTION("char* (char[])",
+        //         "(beware stack smashing on static array or segfault on dynamic array overruns)")
+        // {
+        //     char s[5];
+        //     iss.str("\"test\"");
+        //     iss >> strings::literal(s);
+        //     REQUIRE(std::string(s) == "test");
+        // }
+
+        SECTION("std::basic_string<char>&")
+        {
+            std::basic_string<char> s;
+            iss.str("\"test\"");
+            iss >> strings::literal(s);
+            REQUIRE(s == "test");
+        }
+    }
+
+    SECTION("only expects printable 7-bit ASCII to decode")
+    {
+        std::istringstream iss;
+        std::string s;
+
+        iss.str("\"t\\\\\\\"\\t\\x01\\xfe\"");
+        iss >> strings::literal(s);
+        REQUIRE(s == "t\\\"\t\x01\xfe");
+
+        SECTION("setting failbit for invalid encoding:")
+        {
+            char c;
+            iss.clear();
+
+            SECTION("unprintable 7-bit ASCII values with standard escape")
+            {
+                iss.str("'\t'");
+                iss >> strings::literal(c);
+                REQUIRE(iss.fail());
+            }
+
+            SECTION("unprintable 7-bit ASCII values without standard escape")
+            {
+                iss.str("'\x01'");
+                iss >> strings::literal(c);
+                REQUIRE(iss.fail());
+            }
+
+            SECTION("values oustide 7-bit ASCII range")
+            {
+                iss.str("'\x80'");
+                iss >> strings::literal(c);
+                REQUIRE(iss.fail());
+            }
+        }
+
+        SECTION("eof value extracted from malformed encoding sets failbit",
+                "(not eofbit as expected, may depend on stream char type)")
+        {
+            iss.clear();
+
+            SECTION("EOF")
+            {
+                char c;
+                char s[] { "'_'" };
+                s[1] = std::istringstream::traits_type::eof();
+                iss.str(s);
+                iss >> strings::literal(c);
+                REQUIRE((iss.fail() && !iss.eof()));
+            }
+
+            SECTION("WEOF")
+            {
+                wchar_t wc;
+                wchar_t ws[] { L"'_'" };
+                ws[1] = std::wistringstream::traits_type::eof();
+                std::wistringstream wiss { ws };
+                wiss >> strings::literal(wc);
+                REQUIRE((wiss.fail() && !wiss.eof()));
+            }
+        }
+    }
+
+    SECTION("allows choosing custom escape and delimiter characters")
+    {
+        std::istringstream iss;
         char c;
-        reset_istringstream(iss, "\t");
-        iss >> std::noskipws >> c >> std::skipws;
+
+        iss.str("^|t^");
+        iss >> strings::literal(c, '^', '|');
         REQUIRE(c == '\t');
 
-        reset_istringstream(iss, "'\\t'");
-        iss >> strings::literal(c);
-        REQUIRE(c == '\t');
-
-        std::string s;
-        reset_istringstream(iss, "tes\x7e");
-        iss >> std::noskipws >> s >> std::skipws;
-        REQUIRE(s == "tes\x7e");
-
-        reset_istringstream(iss, "\"tes\\x7e\"");
-        iss >> strings::literal(s);
-        REQUIRE(s == "tes\x7e");
-    }
-
-    SECTION("Chars and STL strings inside supported containers parsed as "
-            "literals by default")
-    {
-        std::vector<char> cv;
-        reset_istringstream(iss, "['t', 'e', 's', '\\t', '\\0']");
-        iss >> cv;
-        REQUIRE(cv == std::vector<char> { 't', 'e', 's', '\t', '\0' });
-
-        std::vector<std::string> sv;
-        reset_istringstream(iss, "[\"tes\\t\"]");
-        iss >> sv;
-        REQUIRE(sv == std::vector<std::string> { { "tes\t" } });
-    }
-
-    SECTION("Default behavior of parsing chars/STL strings inside supported "
-            "containers can be set with I/O manipulator literalrepr")
-    {
-        // default
-        reset_istringstream(iss, "['t', 'e', 's', '\\t', '\\x7f']");
-        std::vector<char> cv1;
-        iss >> cv1;
-        REQUIRE(cv1 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
-
-        reset_istringstream(iss, "[\"tes\\t\"]");
-        std::vector<std::string> sv1;
-        iss >> sv1;
-        REQUIRE(sv1 == std::vector<std::string>{ { "tes\t" } });
-
-        // change from default
-        iss >> strings::quotedrepr;
-
-        reset_istringstream(iss, "['t', 'e', 's', '\t', '\x7f']");
-        std::vector<char> cv2;
-        iss >> cv2;
-        REQUIRE(cv2 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
-
-        reset_istringstream(iss, "[\"tes\t\"]");
-        std::vector<std::string> sv2;
-        iss >> sv2;
-        REQUIRE(sv2 == std::vector<std::string>{ { "tes\t" } });
-
-        // reset to default
-        iss >> strings::literalrepr;
-
-        reset_istringstream(iss, "['t', 'e', 's', '\\t', '\\x7f']");
-        std::vector<char> cv3;
-        iss >> cv3;
-        REQUIRE(cv3 == std::vector<char>{ 't', 'e', 's', '\t', '\x7f' });
-
-        reset_istringstream(iss, "[\"tes\\t\"]");
-        std::vector<std::string> sv3;
-        iss >> sv3;
-        REQUIRE(sv3 == std::vector<std::string>{ { "tes\t" } });
-    }
-
-    SECTION("Parsing of strings as literals continues until trailing delimiter "
-            "or failure",
-            "(' ' does not end parsing, and other unescaped whitespace "
-            "characters set failbit)")
-    {
-        reset_istringstream(iss, "tes t");
-        std::string s;
-        iss >> std::noskipws >> s >> std::skipws;
-        REQUIRE(s == "tes");
-
-        reset_istringstream(iss, "\"tes t\"");
-        s.clear();
-        iss >> strings::literal(s);
-        REQUIRE(s == "tes t");
-
-        reset_istringstream(iss, "\"tes\tt\"");
-        s.clear();
-        iss >> strings::literal(s);
-        REQUIRE(iss.fail());
-
-        reset_istringstream(iss, "[\"tes t\"]");
-        std::vector<std::string> v;
-        iss >> v;
-        REQUIRE(v == std::vector<std::string> { { "tes t" } });
-
-        reset_istringstream(iss, "[\"tes\tt\"]");
-        v.clear();
-        iss >> v;
-        REQUIRE(iss.fail());
-    }
-
-    SECTION("Literal representation uses escapes to limit encoding to 7-bit ASCII values")
-    {
-        SECTION("Only printable 7-bit ASCII delim/escape allowed")
+        SECTION("but enforces encoding by throwing exception for")
         {
-            // printable ASCII delim/escape
-            reset_istringstream(iss, "^|t^");
-            char c;
-            iss >> strings::literal(c, '^', '|');
-            REQUIRE(c == '\t');
+            SECTION("unprintable 7-bit ASCII values")
+            {
+                SECTION("used as delimiter")
+                {
+                    REQUIRE_THROWS_MATCHES(
+                        iss >> strings::literal(c, '\v'),
+                        std::invalid_argument,
+                        Catch::Message(
+                            "literal delim and escape must be printable 7-bit ASCII characters"));
+                }
 
-            // unprintable ASCII delim/escape
-            REQUIRE_THROWS_MATCHES(
-                iss >> strings::literal(c, '\v', '\b'),
-                std::invalid_argument,
-                Catch::Message(
-                    "literal delim and escape must be printable 7-bit ASCII characters"));
+                SECTION("used as escape")
+                {
+                    REQUIRE_THROWS_MATCHES(
+                        iss >> strings::literal(c, '\'', '\v'),
+                        std::invalid_argument,
+                        Catch::Message(
+                            "literal delim and escape must be printable 7-bit ASCII characters"));
+                }
+            }
 
-            // delim/escape out of range
-            REQUIRE_THROWS_MATCHES(
-                iss >> strings::literal(c, '\x80', '\xfe'),
-                std::invalid_argument,
-                Catch::Message(
-                    "literal delim and escape must be printable 7-bit ASCII characters"));
+            SECTION("values out of 7-bit ASCII range")
+            {
+                SECTION("used as delimiter")
+                {
+                    REQUIRE_THROWS_MATCHES(
+                        iss >> strings::literal(c, '\x80'),
+                        std::invalid_argument,
+                        Catch::Message(
+                            "literal delim and escape must be printable 7-bit ASCII characters"));
+                }
+
+                SECTION("used as escape")
+                {
+                    REQUIRE_THROWS_MATCHES(
+                        iss >> strings::literal(c, '\'', '\x80'),
+                        std::invalid_argument,
+                        Catch::Message(
+                            "literal delim and escape must be printable 7-bit ASCII characters"));
+                }
+            }
+        }
+    }
+
+    SECTION("supports differing parameter and stream char type")
+    {
+        SECTION("by using literal prefixes for")
+        {
+            std::istringstream iss;
+
+            SECTION("wchar_t")
+            {
+                std::wstring ws;
+                iss.str("L\"test\"");
+                iss >> strings::literal(ws);
+                REQUIRE(ws == L"test");
+            }
+
+#if (__cplusplus > 201703L)
+            SECTION("char8_t")
+            {
+                std::u8string u8s;
+                iss.str("u8\"test\"");
+                iss >> strings::literal(u8s);
+                REQUIRE(u8s == u8"test");
+            }
+
+#endif
+            SECTION("char16_t")
+            {
+                std::u16string u16s;
+                iss.str("u\"test\"");
+                iss >> strings::literal(u16s);
+                REQUIRE(u16s == u"test");
+            }
+
+            SECTION("char32_t")
+            {
+                std::u32string u32s;
+                iss.str("U\"test\"");
+                iss >> strings::literal(u32s);
+                REQUIRE(u32s == U"test");
+            }
         }
 
-        SECTION("Delimiter and escape characters escaped")
+        SECTION("where parameter char size > stream char size:")
         {
-            reset_istringstream(iss, "'\\''");
-            char c;
-            iss >> strings::literal(c);
-            REQUIRE(c == '\'');
+            std::istringstream iss;
+            std::wstring ws;
 
-            reset_istringstream(iss, "'\\\\'");
-            iss >> strings::literal(c);
-            REQUIRE(c == '\\');
+            SECTION("printable 7-bit ASCII, delim, escape, and standard escapes "
+                    "extracted same regardless of char types")
+            {
+                iss.str("L\"t\\\\\\\"\\t\"");
+                iss >> strings::literal(ws);
+                REQUIRE(ws == L"t\\\"\t");
+            }
 
-            reset_istringstream(iss, "^|^^");
-            iss >> strings::literal(c, '^', '|');
-            REQUIRE(c == '^');
+            SECTION("decoding succeeds on hex escape widths scaled to parameter char type width")
+            {
+                iss.str("L\"\\x00000001\\x000000fe\\xfffffffe\"");
+                iss >> strings::literal(ws);
+                REQUIRE(ws == L"\x01\xfe\xfffffffe");
+            }
 
-            reset_istringstream(iss, "^||^");
-            iss >> strings::literal(c, '^', '|');
-            REQUIRE(c == '|');
+            SECTION("failbit is set on hex escape widths not scaled to parameter char type width")
+            {
+                iss.str("L\"\\x01\\xfe\\xfffffffe\"");
+                iss >> strings::literal(ws);
+                REQUIRE(iss.fail());
+            }
         }
 
-        SECTION("Standard 7-bit ASCII escaped unprintable values escaped")
+        SECTION("where parameter char size < stream char size:")
         {
-            char c;
-            reset_istringstream(iss, "'\\0'");
-            iss >> strings::literal(c);
-            REQUIRE(c == '\0');
-
+            std::wistringstream wiss;
             std::string s;
-            reset_istringstream(iss, "\"\\a\\b\\f\\n\\r\\t\\v\"");
-            iss >> strings::literal(s);
-            REQUIRE(s == "\a\b\f\n\r\t\v");
+
+            SECTION("printable 7-bit ASCII, delim, escape, and standard escapes "
+                    "extracted same regardless of char types")
+            {
+                wiss.str(L"\"t\\\\\\\"\\t\"");
+                wiss >> strings::literal(s);
+                REQUIRE(s == "t\\\"\t");
+            }
+
+            SECTION("decoding of hex escapes scaled to parameter char type width",
+                    "(any following hexadecimal characters are parsed as literals)")
+            {
+                wiss.str(L"\"\\x01\\xfe\\xfffffffe\"");
+                wiss >> strings::literal(s);
+                const char c_str[] { '\x01', '\xfe', '\xff',
+                        'f', 'f', 'f', 'f', 'f', 'e', 0 };
+                REQUIRE(s == c_str);
+            }
         }
-
-        SECTION("Other unprintable values in unsigned 7-bit range hex escaped")
-        {
-            reset_istringstream(iss, "\"\\x01\\x02\\x03\\x04\\x7f\"");
-            std::string s;
-            iss >> strings::literal(s);
-            REQUIRE(s == "\x01\x02\x03\x04\x7f");
-        }
-
-        SECTION("All values out of unsigned 7-bit range hex escaped")
-        {
-            reset_istringstream(iss, "\"\\x80\\x90\\xD0\\xf0\\xfe\"");
-            std::string s;
-            iss >> strings::literal(s);
-            REQUIRE(s == "\x80\x90\xD0\xf0\xfe");
-        }
-    }
-
-    SECTION("Due to use of escapes, mismatch of stream and data char types is supported",
-            "(decoding expects prefix and hex width matching target data char type, "
-            "sets failbit otherwise)")
-    {
-        std::wistringstream wiss;
-
-        // incorrect literal prefix will set failbit
-        std::wstring ws;
-        reset_istringstream(iss,
-            "\"t\\\\\\\"\\t\\x0000007f\\xfffffffe\"");
-        iss >> strings::literal(ws);
-        REQUIRE(iss.fail());
-
-        reset_istringstream(iss,
-            "U\"t\\\\\\\"\\t\\x0000007f\\xfffffffe\"");
-        iss >> strings::literal(ws);
-        REQUIRE(iss.fail());
-
-        // literal prefix must match target char type
-        reset_istringstream(iss,
-            "L\"t\\\\\\\"\\t\\x0000007f\\xfffffffe\"");
-        iss >> strings::literal(ws);
-        REQUIRE(ws == L"t\\\"\t\x7f\xfffffffe");
-
-        reset_istringstream(iss,
-            "[L\"t\\\\\\\"\\t\\x0000007f\\xfffffffe\"]");
-        std::vector<std::wstring> wsv;
-        iss >> wsv;
-        REQUIRE(wsv == std::vector<std::wstring>{ { L"t\\\"\t\x7f\xfffffffe" } });
-
-        reset_istringstream(wiss, L"\"t\\\\\\\"\\t\\x7f\\xfe\"");
-        std::string s;
-        wiss >> strings::literal(s);
-        REQUIRE(s == "t\\\"\t\x7f\xfe");
-
-        reset_istringstream(wiss, L"[\"t\\\\\\\"\\t\\x7f\\xfe\"]");
-        std::vector<std::string> sv;
-        wiss >> sv;
-        REQUIRE(sv == std::vector<std::string>{ { "t\\\"\t\x7f\xfe" } });
-    }
-
-    SECTION("Correct literal encoding will never contain EOF value due to use "
-            "of escapes, but EOF may set failbit if found in malformed encoding")
-    {
-        std::wistringstream wiss;
-
-        // correct encoding
-        char c {};
-        reset_istringstream(iss, "'\\xff'");
-        iss >> strings::literal(c);
-        REQUIRE(c == char(std::istringstream::traits_type::eof()));
-
-        // malformed encoding
-        //   (for some reason char istreams do not set eofbit on extracting EOF,
-        //    but literal() will set failbit as value is not printable 7-bit ASCII)
-        reset_istringstream(iss, "'\xff'");
-        iss >> strings::literal(c);
-        REQUIRE((iss.fail() && !iss.eof()));
-
-        // correct encoding
-        wchar_t wc {};
-        reset_istringstream(wiss, L"L'\\xffffffff'");
-        wiss >> strings::literal(wc);
-        REQUIRE(wc == wchar_t(std::wistringstream::traits_type::eof()));
-
-        // malformed encoding
-        //   (wchar_t istreams set failbit and eofbit on extracting WEOF)
-        reset_istringstream(wiss, L"L'\xffffffff'");
-        wiss >> strings::literal(wc);
-        REQUIRE((wiss.fail() && wiss.eof()));
     }
 }
-*/
 
 TEST_CASE("strings::quoted() printing/output streaming quoted strings",
           "[quoted][strings][output]")
 {
-    SECTION("supports parameter type", "(with example char type = char)")
+    SECTION("supports parameter type",
+            "(example parameter char type = char)")
     {
         std::ostringstream oss;
 
