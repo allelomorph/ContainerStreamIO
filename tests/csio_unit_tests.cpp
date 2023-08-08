@@ -1172,7 +1172,7 @@ TEST_CASE("strings::quoted() parsing/input streaming quoted strings",
             SECTION("delimiter and escape chars escaped, all others extracted directly")
             {
                 iss.str("L\"t\\\\\\\"\t\x01\x80\"");
-                wiss >> strings::quoted(ws);
+                iss >> strings::quoted(ws);
                 REQUIRE(ws == L"t\\\"\t\x01\x80");
             }
         }
@@ -1187,6 +1187,170 @@ TEST_CASE("strings::quoted() parsing/input streaming quoted strings",
             wiss >> strings::quoted(s);
             REQUIRE(wiss.fail());
         }
+    }
+}
+
+TEST_CASE("Strings: printing/output streaming string types inside compatible "
+          "containers uses strings::literal()/quoted()"
+          "[literal][quoted][strings][output]")
+{
+    SECTION("with element type")
+    {
+        std::ostringstream oss;
+
+        // note that constness of vector conferred to elements
+        SECTION("char&")
+        {
+            std::vector<char> vc { { 't' } };
+            oss << vc;
+            REQUIRE(oss.str() == "['t']");
+        }
+
+        SECTION("const char&")
+        {
+            const std::vector<char> vcc { { 't' } };
+            oss << vcc;
+            REQUIRE(oss.str() == "['t']");
+        }
+
+        SECTION("char* (char[])")
+        {
+            // workaround for not being able to assign string literal to char*
+            std::unique_ptr<char[]> up( new char[5] { 't', 'e', 's', 't', 0 } );
+            std::vector<char*> vca { { up.get() } };
+            oss << vca;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+        SECTION("const char* (const char[])")
+        {
+            const std::vector<const char*> vcca { { "test" } };
+            oss << vcca;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+        SECTION("std::basic_string<char>&")
+        {
+            std::vector<std::string> vs { { "test" } };
+            oss << vs;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+        SECTION("const std::basic_string<char>&")
+        {
+            const std::vector<std::string> vcs { { "test" } };
+            oss << vcs;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+#if (__cplusplus >= 201703L)
+        SECTION("std::basic_string_view<char>&")
+        {
+            std::vector<std::string_view> vsv { { "test" } };
+            oss << vsv;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+        SECTION("const std::basic_string_view<char>&")
+        {
+            const std::vector<std::string_view> vcsv { { "test" } };
+            oss << vcsv;
+            REQUIRE(oss.str() == "[\"test\"]");
+        }
+
+#endif  // C++17 and above
+    }
+
+    SECTION("defaults to strings::literal()")
+    {
+        std::ostringstream oss;
+        std::vector<std::string> vs { { "tes\t" } };
+        oss << vs;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+    }
+
+    SECTION("can be set to strings::quoted() with iomanip strings::quotedrepr")
+    {
+        std::ostringstream oss;
+        oss << strings::quotedrepr;
+        std::vector<std::string> vs { { "tes\t" } };
+        oss << vs;
+        REQUIRE(oss.str() == "[\"tes\t\"]");
+    }
+
+    SECTION("can be set to strings::literal() with iomanip strings::literalrepr")
+    {
+        std::ostringstream oss;
+        oss << strings::quotedrepr;   // change from default
+        oss << strings::literalrepr;  // restores default
+        std::vector<std::string> vs { { "tes\t" } };
+        oss << vs;
+        REQUIRE(oss.str() == "[\"tes\\t\"]");
+    }
+}
+
+TEST_CASE("Strings: parsing/input streaming string types inside compatible "
+          "containers uses strings::literal()/quoted()"
+          "[literal][quoted][strings][output]")
+{
+    SECTION("with element type")
+    {
+        std::istringstream iss;
+
+        SECTION("char&")
+        {
+            std::vector<char> vc;
+            iss.str("['t']");
+            iss >> vc;
+            REQUIRE(vc == std::vector<char> { { 't' } });
+        }
+
+        // TBD yet to be implemented
+        // SECTION("char* (char[])", "(beware buffer overruns)")
+        // {
+        //     std::vector<char[5]> vca;
+        //     iss.str("[\"test\"]");
+        //     iss >> vca;
+        //     REQUIRE(vca == std::vector<char[5]> { { "test" } });
+        // }
+
+        SECTION("std::basic_string<char>&")
+        {
+            std::vector<std::string> vs;
+            iss.str("[\"test\"]");
+            iss >> vs;
+            REQUIRE(vs == std::vector<std::string> { { "test" } });
+        }
+    }
+
+    SECTION("defaults to strings::literal()")
+    {
+        std::istringstream iss;
+        std::vector<std::string> vs;
+        iss.str("[\"tes\\t\"]");
+        iss >> vs;
+        REQUIRE(vs == std::vector<std::string> { { "tes\t" } });
+    }
+
+    SECTION("can be set to strings::quoted() with iomanip strings::quotedrepr")
+    {
+        std::istringstream iss;
+        iss >> strings::quotedrepr;
+        std::vector<std::string> vs;
+        iss.str("[\"tes\t\"]");
+        iss >> vs;
+        REQUIRE(vs == std::vector<std::string> { { "tes\t" } });
+    }
+
+    SECTION("can be set to strings::literal() with iomanip strings::literalrepr")
+    {
+        std::istringstream iss;
+        iss >> strings::quotedrepr;   // change from default
+        iss >> strings::literalrepr;  // restores default
+        std::vector<std::string> vs;
+        iss.str("[\"tes\\t\"]");
+        iss >> vs;
+        REQUIRE(vs == std::vector<std::string> { { "tes\t" } });
     }
 }
 
