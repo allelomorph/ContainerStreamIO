@@ -1012,172 +1012,184 @@ TEST_CASE("strings::quoted() printing/output streaming quoted strings",
     }
 }
 
- /*
-TEST_CASE("Strings: parsing chars/STL strings as quoted strings",
+TEST_CASE("strings::quoted() parsing/input streaming quoted strings",
           "[quoted][strings][input]")
 {
-    
-    std::istringstream iss;
-
-    SECTION("Chars/STL strings outside supported containers can be parsed as "
-            "quoted using quoted()")
+    SECTION("supports parameter type",
+            "(example parameter char type = char)")
     {
+        std::istringstream iss;
+
+        SECTION("char&")
+        {
+            char c;
+            iss.str("'t'");
+            iss >> strings::quoted(c);
+            REQUIRE(c == 't');
+        }
+
+        // TBD yet to implement
+        // SECTION("char* (char[])",
+        //         "(beware stack smashing on static array or segfault on dynamic array overruns)")
+        // {
+        //     char s[5];
+        //     iss.str("\"test\"");
+        //     iss >> strings::quoted(s);
+        //     REQUIRE(std::string(s) == "test");
+        // }
+
+        SECTION("std::basic_string<char>&")
+        {
+            std::basic_string<char> s;
+            iss.str("\"test\"");
+            iss >> strings::quoted(s);
+            REQUIRE(s == "test");
+        }
+    }
+
+    SECTION("only expects escape and delimiter to be escaped")
+    {
+        std::istringstream iss;
+        std::string s;
+
+        iss.str("\"t\\\\\\\"\t\x01\xfe\"");
+        iss >> strings::quoted(s);
+        REQUIRE(s == "t\\\"\t\x01\xfe");
+
+        SECTION("setting failbit for invalid encoding:")
+        {
+            char c;
+            iss.clear();
+
+            SECTION("any character other than delimiter and escape escaped")
+            {
+                iss.str("'\\t'");
+                iss >> strings::quoted(c);
+                REQUIRE(iss.fail());
+            }
+        }
+
+        SECTION("eof value extracted from quoted string sets failbit",
+                "(not eofbit as expected, may depend on stream char type)")
+        {
+            iss.clear();
+
+            SECTION("EOF")
+            {
+                char c;
+                char s[] { "'_'" };
+                s[1] = std::istringstream::traits_type::eof();
+                iss.str(s);
+                iss >> strings::quoted(c);
+                REQUIRE((iss.fail() && !iss.eof()));
+            }
+
+            SECTION("WEOF")
+            {
+                wchar_t wc;
+                wchar_t ws[] { L"'_'" };
+                ws[1] = std::wistringstream::traits_type::eof();
+                std::wistringstream wiss { ws };
+                wiss >> strings::quoted(wc);
+                REQUIRE((wiss.fail() && !wiss.eof()));
+            }
+        }
+    }
+
+    SECTION("allows choosing custom escape and delimiter characters of any value:")
+    {
+        std::istringstream iss;
         char c;
-        reset_istringstream(iss, "\t");
-        iss >> std::noskipws >> c >> std::skipws;
-        REQUIRE(c == '\t');
 
-        reset_istringstream(iss, "'\t'");
-        iss >> strings::quoted(c);
-        REQUIRE(c == '\t');
+        SECTION("printable 7-bit ASCII values")
+        {
+            iss.str("^||^");
+            iss >> strings::quoted(c, '^', '|');
+            REQUIRE(c == '|');
+        }
 
-        std::string s;
-        reset_istringstream(iss, "tes\x7f");
-        iss >> std::noskipws >> s >> std::skipws;
-        REQUIRE(s == "tes\x7f");
+        SECTION("unprintable 7-bit ASCII values")
+        {
+            iss.str("\v\b\b\v");
+            iss >> strings::quoted(c, '\v', '\b');
+            REQUIRE(c == '\b');
+        }
 
-        reset_istringstream(iss, "\"tes\x7f\"");
-        iss >> strings::quoted(s);
-        REQUIRE(s == "tes\x7f");
+        SECTION("values out of 7-bit ASCII range")
+        {
+            iss.str("\x80\x81\x81\x80");
+            iss >> strings::quoted(c, '\x80', '\x81');
+            REQUIRE(c == '\x81');
+        }
     }
 
-    SECTION("Chars/STL strings inside supported containers not parsed as "
-            "quoted by default")
+    SECTION("supports differing parameter and stream char type")
     {
-        std::vector<char> cv;
-        reset_istringstream(iss, "['t', 'e', 's', '\t', '\x7f']");
-        iss >> cv;
-        REQUIRE(cv != std::vector<char> { 't', 'e', 's', '\t', '\x7f' });
+        SECTION("by using literal prefixes for")
+        {
+            std::istringstream iss;
 
-        std::vector<std::string> sv;
-        reset_istringstream(iss, "[\"tes\t\"]");
-        iss >> sv;
-        REQUIRE(sv != std::vector<std::string> { { "tes\t" } });
-    }
+            SECTION("wchar_t")
+            {
+                std::wstring ws;
+                iss.str("L\"test\"");
+                iss >> strings::quoted(ws);
+                REQUIRE(ws == L"test");
+            }
 
-    SECTION("Default behavior of parsing chars/STL strings inside supported "
-            "containers can be set with I/O manipulator quotedrepr")
-    {
-        iss >> strings::quotedrepr;
+#if (__cplusplus > 201703L)
+            SECTION("char8_t")
+            {
+                std::u8string u8s;
+                iss.str("u8\"test\"");
+                iss >> strings::quoted(u8s);
+                REQUIRE(u8s == u8"test");
+            }
 
-        std::vector<char> cv;
-        reset_istringstream(iss, "['t', 'e', 's', '\t', '\x7f']");
-        iss >> cv;
-        REQUIRE(cv == std::vector<char> { 't', 'e', 's', '\t', '\x7f' });
-
-        std::vector<std::string> sv;
-        reset_istringstream(iss, "[\"tes\t\"]");
-        iss >> sv;
-        REQUIRE(sv == std::vector<std::string> { { "tes\t" } });
-    }
-
-    SECTION("Parsing of strings as quoted continues until trailing delimiter "
-            "or failure, regardless of any whitespace characters extracted")
-    {
-        reset_istringstream(iss, "tes t");
-        std::string s;
-        iss >> std::noskipws >> s >> std::skipws;
-        REQUIRE(s == "tes");
-
-        reset_istringstream(iss, "\"tes t\"");
-        s.clear();
-        iss >> strings::quoted(s);
-        REQUIRE(s == "tes t");
-
-        reset_istringstream(iss, "\"tes\tt\"");
-        s.clear();
-        iss >> strings::quoted(s);
-        REQUIRE(s == "tes\tt");
-
-        reset_istringstream(iss, "[\"tes t\"]");
-        std::vector<std::string> v;
-        iss >> strings::quotedrepr >> v;
-        REQUIRE(v == std::vector<std::string> { { "tes t" } });
-
-        reset_istringstream(iss, "[\"tes\tt\"]");
-        v.clear();
-        iss >> v;
-        REQUIRE(v == std::vector<std::string> { { "tes\tt" } });
-    }
-
-    SECTION("Due to passing mostly unescaped values, only string char types of "
-            "width greater than or equal to stream char width supported")
-    {
-        std::wistringstream wiss;
-
-        // TBD need to consider signed -> unsigned conversions
-        // sizeof(StreamCharType) < sizeof(StringCharType)
-        reset_istringstream(iss, "L\"t\\\\\\\"\t\x7f\xfe\"");
-        std::wstring ws;
-        iss >> strings::quoted(ws);
-        REQUIRE(ws == L"t\\\"\t\x7f\xfffffffe");
-
-        // sizeof(StreamCharType) == sizeof(StringCharType)
-        reset_istringstream(iss, "\"t\\\\\\\"\t\x7f\xfe\"");
-        std::string s;
-        iss >> strings::quoted(s);
-        REQUIRE(s == "t\\\"\t\x7f\xfe");
-
-        // sizeof(StreamCharType) > sizeof(StringCharType)
-        reset_istringstream(wiss, L"\"t\\\\\\\"\t\x7f\xfe\"");
-        s.clear();
-        wiss >> strings::quoted(s);
-        REQUIRE(wiss.fail());
-    }
-
-    SECTION("Extracting EOF values in a quoted representation from a stream will "
-            "set failbit and eofbit for some char types")
-    {
-        reset_istringstream(iss, "\xff");
-        char c;
-        iss >> c;
-        REQUIRE(iss.good());
-        REQUIRE(c == char(std::ostringstream::traits_type::eof()));
-
-        reset_istringstream(iss, "'\xff'");
-        c = 0;
-        iss >> strings::quoted(c);
-        REQUIRE(iss.good());
-        REQUIRE(c == char(std::ostringstream::traits_type::eof()));
-
-        std::wistringstream wiss;
-
-        reset_istringstream(wiss, L"\xffffffff");
-        wchar_t wc;
-        wiss >> wc;
-        REQUIRE((wiss.fail() && wiss.eof()));
-
-        reset_istringstream(wiss, L"L'\xffffffff'");
-        wiss >> strings::quoted(wc);
-        REQUIRE((wiss.fail() && wiss.eof()));
-    }
-
-#if (__cplusplus >= 201402L)
-    SECTION("With same stream and element char types, quoted representation "
-            "should match std::quoted apart from literal prefixes")
-    {
-        std::wistringstream wiss;
-
-        reset_istringstream(iss, "\"t\\\"\t\x7f\xfe\"");
-        std::string s;
-        iss >> strings::quoted(s);
-        reset_istringstream(iss, "\"t\\\"\t\x7f\xfe\"");
-        std::string _s;
-        iss >> std::quoted(_s);
-        REQUIRE(s == _s);
-
-        // container_stream_io::strings::quoted requires literal prefix L'L'
-        reset_istringstream(wiss, L"L\"t\\\"\t\x0000007f\xfffffffe\"");
-        std::wstring ws;
-        wiss >> strings::quoted(ws);
-        reset_istringstream(wiss, L"\"t\\\"\t\x0000007f\xfffffffe\"");
-        std::wstring _ws;
-        wiss >> std::quoted(_ws);
-        REQUIRE(ws == _ws);
-    }
 #endif
+            SECTION("char16_t")
+            {
+                std::u16string u16s;
+                iss.str("u\"test\"");
+                iss >> strings::quoted(u16s);
+                REQUIRE(u16s == u"test");
+            }
+
+            SECTION("char32_t")
+            {
+                std::u32string u32s;
+                iss.str("U\"test\"");
+                iss >> strings::quoted(u32s);
+                REQUIRE(u32s == U"test");
+            }
+        }
+
+        SECTION("where parameter char size > stream char size:")
+        {
+            std::istringstream iss;
+            std::wstring ws;
+
+            SECTION("delimiter and escape chars escaped, all others extracted directly")
+            {
+                iss.str("L\"t\\\\\\\"\t\x01\x80\"");
+                wiss >> strings::quoted(ws);
+                REQUIRE(ws == L"t\\\"\t\x01\x80");
+            }
+        }
+
+        SECTION("but not when parameter char size < stream char size",
+                "(prevents potential overflow in char conversions)")
+        {
+            std::wistringstream wiss;
+            std::string s;
+
+            wiss.str(L"\"test\"");
+            wiss >> strings::quoted(s);
+            REQUIRE(wiss.fail());
+        }
+    }
 }
-*/
+
 /*
 TEST_CASE("Delimiters: validate char defaults", "[decorator]")
 {
