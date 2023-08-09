@@ -19,10 +19,7 @@
 #include <unordered_map>
 #include <stack>
 #include <queue>
-
 #include <sstream>
-
-#include "TypeName.hh"  // testing
 
 #if (__cplusplus < 201103L)
 #error "csio_unit_tests.cpp only supports C++11 and above"
@@ -30,40 +27,6 @@
 
 namespace
 {
-
-/**
- * @brief An RAII wrapper that will execute an action when the wrapper falls out of scope, or is
- * otherwise destroyed.
- */
-template <typename LambdaType>
-class scope_exit
-{
-public:
-    scope_exit(LambdaType&& lambda) noexcept : m_lambda{ std::move(lambda) }
-    {
-        static_assert(
-#if __cplusplus >= 201703L
-            std::is_nothrow_invocable<LambdaType>::value,
-#else
-            noexcept(lambda),
-#endif
-            "Since the callable type is invoked from the destructor, exceptions are not allowed.");
-    }
-
-    ~scope_exit() noexcept
-    {
-        m_lambda();
-    }
-
-    scope_exit(const scope_exit&) = delete;
-    scope_exit& operator=(const scope_exit&) = delete;
-
-    scope_exit(scope_exit&&) = default;
-    scope_exit& operator=(scope_exit&&) = default;
-
-private:
-    LambdaType m_lambda;
-};
 
 template <typename Type>
 class vector_wrapper : public std::vector<Type>
@@ -75,9 +38,50 @@ template <typename Type>
 class stack_wrapper : public std::stack<Type>
 {};
 
-/**
- * @brief Custom formatting struct.
- */
+#if __cplusplus >= 201703L
+
+template <typename CharT>
+using common_str_type = std::common_type_t<std::basic_string_view<CharT>>;
+
+#else
+
+template <typename CharT>
+using common_str_type = typename std::common_type<std::basic_string<CharT>>::type;
+
+#endif
+
+inline bool idiomatic_strcmp(
+    const common_str_type<char> s1, const common_str_type<char> s2)
+{
+    return s1 == s2;
+}
+
+inline bool idiomatic_strcmp(
+    const common_str_type<wchar_t> s1, const common_str_type<wchar_t> s2)
+{
+    return s1 == s2;
+}
+
+#if __cplusplus > 201703L
+inline bool idiomatic_strcmp(
+    const common_str_type<char8_t> s1, const common_str_type<char8_t> s2)
+{
+    return s1 == s2;
+}
+#endif
+
+inline bool idiomatic_strcmp(
+    const common_str_type<char16_t> s1, const common_str_type<char16_t> s2)
+{
+    return s1 == s2;
+}
+
+inline bool idiomatic_strcmp(
+    const common_str_type<char32_t> s1, const common_str_type<char32_t> s2)
+{
+    return s1 == s2;
+}
+
 struct custom_formatter
 {
     template <typename StreamType> void print_prefix(StreamType& stream) const noexcept
@@ -102,70 +106,10 @@ struct custom_formatter
     }
 };
 
-template <typename CStrTypeA, typename CStrTypeB>
-auto idiomatic_strcmp(const CStrTypeA s1, const CStrTypeB s2
-    ) -> std::enable_if_t<
-        std::is_pointer<typename std::decay<CStrTypeA>::type>::value &&
-        std::is_pointer<typename std::decay<CStrTypeB>::type>::value,
-        bool>
-{
-    using char_type = typename std::remove_const<
-        typename std::pointer_traits<
-        typename std::decay<CStrTypeB>::type >::element_type >::type;
-#if __cplusplus >= 201703L
-    return s1 == std::basic_string_view<char_type>(s2);
-#else
-    return s1 == std::basic_string<char_type>(s2);
-#endif
-}
-
-using namespace container_stream_io::strings::compile_time;  // string_literal
-
-// TBD these do not affect iword/pword, and so not quoted/literal default
-//   - could use `(o|i)ss.copyfmt(std::basic_(o|i)stringstream<CharType>{});`,
-//   but at that point why not just `(o|i)ss = std::basic_(o|i)stringstream<CharType>{};`?
-// TBD consider another reason to remove these altogether - the intended use of
-//   Catch2 TEST_CASE and SECTION (which can be nested) is to share setup:
-//   - https://github.com/catchorg/Catch2/blob/devel/docs/tutorial.md#test-cases-and-sections
-//   (tradeoff is that every nested section must be named and bracketed, which
-//   will make this file much longer and potentially less readable...)
-template<typename CharType>
-void reset_ostringstream(std::basic_ostringstream<CharType>& oss)
-{
-    static const auto default_flags {
-        std::basic_ostringstream<CharType>{}.flags() };
-    oss.str(STRING_LITERAL(CharType, ""));
-    oss.clear();
-    oss.flags(default_flags);
-}
-
-template<typename CharType>
-void reset_istringstream(
-    std::basic_istringstream<CharType>& iss,
-    const CharType* s = STRING_LITERAL(CharType, ""))
-{
-    static const auto default_flags {
-        std::basic_istringstream<CharType>{}.flags() };
-    iss.str(s);
-    iss.clear();
-    iss.flags(default_flags);
-}
-
-template<typename CharType>
-void reset_istringstream(
-    std::basic_istringstream<CharType>& iss, const std::basic_string<CharType>& s)
-{
-    static const auto default_flags {
-        std::basic_istringstream<CharType>{}.flags() };
-    iss.str(s);
-    iss.clear();
-    iss.flags(default_flags);
-}
-
 } // namespace
 
 using namespace container_stream_io;
-/*
+
 TEST_CASE("Traits: detect parseable (input stream extractable) container types",
           "[traits][input]")
 {
@@ -343,8 +287,7 @@ TEST_CASE("Traits: detect emplace methods", "[traits]")
     REQUIRE(traits::has_iterless_emplace<int>::value == false);
     REQUIRE(traits::has_emplace_back<int>::value == false);
 }
-*/
-/*
+
 TEST_CASE("strings::literal() printing/output streaming escaped literals",
           "[literal][strings][output]")
 {
@@ -1207,7 +1150,6 @@ TEST_CASE("Strings: printing/output streaming string types inside compatible "
     {
         std::ostringstream oss;
 
-        // note that constness of vector conferred to elements
         SECTION("char&")
         {
             std::vector<char> vc { { 't' } };
@@ -1215,6 +1157,7 @@ TEST_CASE("Strings: printing/output streaming string types inside compatible "
             REQUIRE(oss.str() == "['t']");
         }
 
+        // note that constness of vector conferred to elements
         SECTION("const char&")
         {
             const std::vector<char> vcc { { 't' } };
@@ -1362,8 +1305,7 @@ TEST_CASE("Strings: parsing/input streaming string types inside compatible "
         REQUIRE(vs == std::vector<std::string> { { "tes\t" } });
     }
 }
-*/
-/*
+
 TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
 {
     SECTION("non-specialized container type")
@@ -1371,10 +1313,10 @@ TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "[" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  "," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     "]" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "["));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  ","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     "]"));
     }
 
     SECTION("std::set<...>")
@@ -1383,10 +1325,10 @@ TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::set<int>, char>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "{" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  "," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     "}" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "{"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  ","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     "}"));
     }
 
     SECTION("std::pair<...>")
@@ -1395,10 +1337,10 @@ TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::pair<int, float>, char>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "(" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  "," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     ")" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "("));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  ","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     ")"));
     }
 
     SECTION("std::tuple<...>")
@@ -1407,10 +1349,10 @@ TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::tuple<int, float>, char>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "<" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  "," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     ">" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     "<"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  ","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, " "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     ">"));
     }
 }
 
@@ -1421,10 +1363,10 @@ TEST_CASE("Delimiters: validate wchar_t defaults for", "[decorator]")
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], wchar_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"[" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  L"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"]" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"["));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  L","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"]"));
     }
 
     SECTION("std::set<...>")
@@ -1433,10 +1375,10 @@ TEST_CASE("Delimiters: validate wchar_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::set<int>, wchar_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"{" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  L"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"}" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"{"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  L","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"}"));
     }
 
     SECTION("std::pair<...>")
@@ -1445,10 +1387,10 @@ TEST_CASE("Delimiters: validate wchar_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::pair<int, float>, wchar_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"(" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  L"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L")" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"("));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  L","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L")"));
     }
 
     SECTION("std::tuple<...>")
@@ -1457,10 +1399,10 @@ TEST_CASE("Delimiters: validate wchar_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::tuple<int, float>, wchar_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"<" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  L"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L">" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     L"<"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  L","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, L" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     L">"));
     }
 }
 
@@ -1472,10 +1414,10 @@ TEST_CASE("Delimiters: validate char8_t defaults for", "[decorator]")
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char8_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"[" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"]" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"["));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"]"));
     }
 
     SECTION("std::set<...>")
@@ -1484,10 +1426,10 @@ TEST_CASE("Delimiters: validate char8_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::set<int>, char8_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"{" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"}" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"{"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"}"));
     }
 
     SECTION("std::pair<...>")
@@ -1496,10 +1438,10 @@ TEST_CASE("Delimiters: validate char8_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::pair<int, float>, char8_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"(" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8")" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"("));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8")"));
     }
 
     SECTION("std::tuple<...>")
@@ -1508,10 +1450,10 @@ TEST_CASE("Delimiters: validate char8_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::tuple<int, float>, char8_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"<" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8">" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u8"<"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u8","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u8" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8">"));
     }
 }
 #endif  // above C++17
@@ -1523,10 +1465,10 @@ TEST_CASE("Delimiters: validate char16_t defaults for", "[decorator]")
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char16_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"[" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"]" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"["));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"]"));
     }
 
     SECTION("std::set<...>")
@@ -1535,10 +1477,10 @@ TEST_CASE("Delimiters: validate char16_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::set<int>, char16_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"{" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"}" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"{"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"}"));
     }
 
     SECTION("std::pair<...>")
@@ -1547,10 +1489,10 @@ TEST_CASE("Delimiters: validate char16_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::pair<int, float>, char16_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"(" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u")" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"("));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u")"));
     }
 
     SECTION("std::tuple<...>")
@@ -1559,10 +1501,10 @@ TEST_CASE("Delimiters: validate char16_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::tuple<int, float>, char16_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"<" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  u"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u">" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     u"<"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  u","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, u" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     u">"));
     }
 }
 
@@ -1573,10 +1515,10 @@ TEST_CASE("Delimiters: validate char32_t defaults for", "[decorator]")
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char32_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"[" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  U"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"]" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"["));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  U","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"]"));
     }
 
     SECTION("std::set<...>")
@@ -1585,10 +1527,10 @@ TEST_CASE("Delimiters: validate char32_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::set<int>, char32_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"{" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  U"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"}" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"{"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  U","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"}"));
     }
 
     SECTION("std::pair<...>")
@@ -1597,10 +1539,10 @@ TEST_CASE("Delimiters: validate char32_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::pair<int, float>, char32_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"(" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  U"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U")" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"("));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  U","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U")"));
     }
 
     SECTION("std::tuple<...>")
@@ -1609,13 +1551,12 @@ TEST_CASE("Delimiters: validate char32_t defaults for", "[decorator]")
             container_stream_io::decorator::delimiters<
             std::tuple<int, float>, char32_t>::values };
 
-        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"<" ));
-        REQUIRE(idiomatic_strcmp(delimiters.separator,  U"," ));
-        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" " ));
-        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U">" ));
+        REQUIRE(idiomatic_strcmp(delimiters.prefix,     U"<"));
+        REQUIRE(idiomatic_strcmp(delimiters.separator,  U","));
+        REQUIRE(idiomatic_strcmp(delimiters.whitespace, U" "));
+        REQUIRE(idiomatic_strcmp(delimiters.suffix,     U">"));
     }
 }
-*/
 
 TEST_CASE("Printing/output streaming non-nested container types",
           "[output]")
@@ -1832,11 +1773,7 @@ TEST_CASE("Parsing/input streaming non-nested container types",
         std::istringstream iss { "test" };
         char s[5];
         iss >> s;
-#if (__cplusplus < 201703L)
-        REQUIRE(std::string(s) == "test");
-#else
-        REQUIRE(std::string_view(s) == "test");
-#endif
+        REQUIRE(idiomatic_strcmp(s, "test"));
     }
 
     SECTION("supports NonCharType[]")
@@ -1971,13 +1908,8 @@ TEST_CASE("Parsing/input streaming nested container types",
             iss.str("[\"tes\\t\", \"\\test\"]");
             char sa[2][5];
             iss >> sa;
-#if (__cplusplus < 201703L)
-            REQUIRE(std::string(sa[0]) == "tes\t");
-            REQUIRE(std::string(sa[1]) == "\test");
-#else
-            REQUIRE(std::string_view(sa[0]) == "tes\t");
-            REQUIRE(std::string_view(sa[1]) == "\test");
-#endif
+            REQUIRE(idiomatic_strcmp(sa[0], "tes\t"));
+            REQUIRE(idiomatic_strcmp(sa[1], "\test"));
         }
 
         SECTION("NonCharType[][]")
@@ -2078,7 +2010,6 @@ TEST_CASE("Supported container types should not change after being encoded and "
             ss << a;
             int _a[3];
             ss >> _a;
-            REQUIRE(sizeof(_a) == sizeof(a));
             REQUIRE(_a[0] == a[0]);
             REQUIRE(_a[1] == a[1]);
             REQUIRE(_a[2] == a[2]);
@@ -2209,13 +2140,9 @@ TEST_CASE("Supported container types should not change after being encoded and "
             char sa[2][5] { { "tes\t" }, { "\test" } };
             ss << sa;
             char _sa[2][5];
-#if (__cplusplus < 201703L)
-            REQUIRE(std::string(_sa[0]) == sa[0]);
-            REQUIRE(std::string(_sa[1]) == sa[1]);
-#else
-            REQUIRE(std::string_view(_sa[0]) == sa[0]);
-            REQUIRE(std::string_view(_sa[1]) == sa[1]);
-#endif
+            ss >> _sa;
+            REQUIRE(idiomatic_strcmp(_sa[0], sa[0]));
+            REQUIRE(idiomatic_strcmp(_sa[1], sa[1]));
         }
 
         SECTION("NonCharType[][]")
