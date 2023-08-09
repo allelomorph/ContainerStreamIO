@@ -2064,6 +2064,245 @@ TEST_CASE("Parsing/input streaming nested container types",
     }
 }
 
+TEST_CASE("Supported container types should not change after being encoded and "
+          "then decoded",
+          "[output][input]")
+{
+    SECTION("when non-nested")
+    {
+        std::stringstream ss;
+
+        SECTION("NonCharType[]")
+        {
+            int a[] { 1, 2, 3 };
+            ss << a;
+            int _a[3];
+            ss >> _a;
+            REQUIRE(sizeof(_a) == sizeof(a));
+            REQUIRE(_a[0] == a[0]);
+            REQUIRE(_a[1] == a[1]);
+            REQUIRE(_a[2] == a[2]);
+        }
+
+        SECTION("std::array")
+        {
+            std::array<int, 5> a { 1, 2, 3, 4, 5 };
+            ss << a;
+            std::array<int, 5> _a;
+            ss >>_a;
+            REQUIRE(_a == a);
+        }
+
+        SECTION("std::vector")
+        {
+            std::vector<int> v { 1, 2, 3, 4, 5 };
+            ss << v;
+            std::vector<int> _v;
+            ss >>_v;
+            REQUIRE(_v == v);
+        }
+
+        SECTION("std::pair")
+        {
+            std::pair<int, double> p { 1, 1.5 };
+            ss << p;
+            std::pair<int, double> _p;
+            ss >>_p;
+            REQUIRE(_p == p);
+        }
+
+        SECTION("std::tuple")
+        {
+            std::tuple<int, double, short> t { 1, 1.5, 2 };
+            ss << t;
+            std::tuple<int, double, short> _t;
+            ss >> _t;
+            REQUIRE(_t == t);
+        }
+
+        SECTION("std::deque")
+        {
+            std::deque<int> d { 1, 2, 3, 4, 5 };
+            ss << d;
+            std::deque<int> _d;
+            ss >> _d;
+            REQUIRE(_d == d);
+        }
+
+        SECTION("std::forward_list")
+        {
+            std::forward_list<int> fl { 1, 2, 3, 4, 5 };
+            ss << fl;
+            std::forward_list<int> _fl;
+            ss >> _fl;
+            REQUIRE(_fl == fl);
+        }
+
+        SECTION("std::list")
+        {
+            std::list<int> l { 1, 2, 3, 4, 5 };
+            ss << l;
+            std::list<int> _l;
+            ss >> _l;
+            REQUIRE(_l == l);
+        }
+
+        SECTION("std::set")
+        {
+            std::set<int> s { 1, 2, 3, 4, 5 };
+            ss << s;
+            std::set<int> _s { 1, 2, 3, 4, 5 };
+            ss >> _s;
+            REQUIRE(_s == s);
+        }
+
+        SECTION("std::multiset")
+        {
+            std::multiset<int> ms { 1, 2, 3, 4, 5 };
+            ss << ms;
+            std::multiset<int> _ms;
+            ss >> _ms;
+            REQUIRE(_ms == ms);
+        }
+
+        SECTION("std::unordered_set",
+                "(unordered by definition, so serialization can be unpredictable, "
+                "but resulting contents should be equivalent)")
+        {
+            std::unordered_set<int> us { 1, 2, 3, 4, 5 };
+            ss << us;
+            std::unordered_set<int> _us;
+            ss >> _us;
+            REQUIRE(_us == us);
+        }
+
+        SECTION("std::unordered_multiset",
+                "(unordered by definition, so serialization can be unpredictable, "
+                "but resulting contents should be equivalent)")
+        {
+            std::unordered_multiset<int> ums { 1, 2, 3, 4, 5 };
+            ss << ums;
+            std::unordered_multiset<int> _ums;
+            ss >> _ums;
+            REQUIRE(_ums == ums);
+        }
+
+        SECTION("iterable custom container class",
+                "(iterable being defiend as having members (typename)iterator, "
+                "begin(), end(), and empty())")
+        {
+            vector_wrapper<int> vr { { 1, 2, 3, 4, 5 } };
+            ss << vr;
+            vector_wrapper<int> _vr { { 1, 2, 3, 4, 5 } };
+            ss >> _vr;
+            REQUIRE(_vr == vr);
+        }
+    }
+
+    SECTION("when nested with C arrays in configurations like")
+    {
+        std::stringstream ss;
+
+        SECTION("CharType[][] !!! currently failing with elements not printed using literal()",
+                "(considered array of char*)")
+        {
+            char sa[2][5] { { "tes\t" }, { "\test" } };
+            ss << sa;
+            char _sa[2][5];
+#if (__cplusplus < 201703L)
+            REQUIRE(std::string(_sa[0]) == sa[0]);
+            REQUIRE(std::string(_sa[1]) == sa[1]);
+#else
+            REQUIRE(std::string_view(_sa[0]) == sa[0]);
+            REQUIRE(std::string_view(_sa[1]) == sa[1]);
+#endif
+        }
+
+        SECTION("NonCharType[][]")
+        {
+            int aa[2][2] { { 1, 2 }, { 3, 4 } };
+            ss << aa;
+            int _aa[2][2];
+            ss >> _aa;
+            REQUIRE(_aa[0][0] == aa[0][0]);
+            REQUIRE(_aa[0][1] == aa[0][1]);
+            REQUIRE(_aa[1][0] == aa[1][0]);
+            REQUIRE(_aa[1][1] == aa[1][1]);
+        }
+
+        SECTION("StlContainerType<>[]")
+        {
+            std::vector<int> av[] { { 1, 2, 3 }, { 4, 5, 6 } };
+            ss << av;
+            std::vector<int> _av[2];
+            ss >> _av;
+            REQUIRE(_av[0] == av[0]);
+            REQUIRE(_av[1] == av[1]);
+        }
+
+        // TBD fix istreaming into containers with non-move-constructible elements
+        // SECTION("StlContainerType<Type[]>")
+        // {
+        //     // bracketed initializer lists not successful
+        //     std::vector<int[2]> va { 2 };
+        //     va[0][0] = 1; va[0][1] = 2;
+        //     va[1][0] = 3; va[1][1] = 4;
+        //     ss << va;
+        //     std::vector<int[2]> _va { 2 };
+        //     // ss >> _va;  // won't compile
+        //     REQUIRE(_aa[0][0] == aa[0][0]);
+        //     REQUIRE(_aa[0][1] == aa[0][1]);
+        //     REQUIRE(_aa[1][0] == aa[1][0]);
+        //     REQUIRE(_aa[1][1] == aa[1][1]);
+        // }
+    }
+
+    SECTION("with nested STL container combinations like")
+    {
+        std::stringstream ss;
+
+        SECTION("std::map")
+        {
+            std::map<int, float> m { { 1, 1.5 }, { 2, 2.5 } };
+            ss << m;
+            std::map<int, float> _m;
+            ss >> _m;
+            REQUIRE(_m == m);
+        }
+
+        SECTION("std::multimap")
+        {
+            std::multimap<int, float> mm { { 1, 1.5 }, { 2, 2.5 } };
+            ss << mm;
+            std::multimap<int, float> _mm;
+            ss >> _mm;
+            REQUIRE(_mm == mm);
+        }
+
+        SECTION("std::unordered_map",
+                "(unordered by definition, so serialization can be unpredictable, "
+                "but resulting contents should be equivalent)")
+        {
+            std::unordered_map<int, float> um { { 1, 1.5 }, { 2, 2.5 } };
+            ss << um;
+            std::unordered_map<int, float> _um;
+            ss >> _um;
+            REQUIRE(_um == um);
+        }
+
+        SECTION("std::unordered_multimap",
+                "(unordered by definition, so serialization can be unpredictable, "
+                "but resulting contents should be equivalent)")
+        {
+            std::unordered_multimap<int, float> umm { { 1, 1.5 }, { 2, 2.5 } };
+            ss << umm;
+            std::unordered_multimap<int, float> _umm;
+            ss >> _umm;
+            REQUIRE(_umm == umm);
+        }
+    }
+}
+
 /*
 TEST_CASE("Printing with Custom Formatters")
 {
