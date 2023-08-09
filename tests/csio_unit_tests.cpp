@@ -110,126 +110,193 @@ struct custom_formatter
 
 using namespace container_stream_io;
 
-TEST_CASE("Traits: detect parseable (input stream extractable) container types",
+TEST_CASE("Traits: detect as parseable (input stream extractable)",
           "[traits][input]")
 {
-
-    SECTION("Detect most STL containers as being parseable container types")
+    SECTION("non-nested")
     {
-        REQUIRE(traits::is_parseable_as_container<std::array<int, 5>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::vector<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::pair<int, double>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::tuple<int, double, float>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::deque<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::forward_list<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::list<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::set<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::multiset<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::map<int, float>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::multimap<int, float>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::unordered_set<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::unordered_multiset<int>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::unordered_map<int, float>>::value == true);
-        REQUIRE(traits::is_parseable_as_container<std::unordered_multimap<int, float>>::value == true);
+        SECTION("C arrays of non-char type")
+        {
+            REQUIRE(traits::is_parseable_as_container<int[5]>::value == true);
+        }
+
+        SECTION("supported STL containers")
+        {
+            REQUIRE(traits::is_parseable_as_container<std::array<int, 5>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::vector<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::pair<int, double>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::tuple<int, double, float>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::deque<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::forward_list<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::list<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::set<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::multiset<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::unordered_set<int>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::unordered_multiset<int>>::value == true);
+        }
+
+        SECTION("custom iterable container class",
+                "(iterable being defiend as having members (typename)iterator, "
+                "begin(), end(), and empty())")
+        {
+            REQUIRE(traits::is_parseable_as_container<vector_wrapper<int>>::value == true);
+        }
     }
 
-    SECTION("Detect C-like array of non-char type as being a parseable container type")
+    SECTION("nesting")
     {
-        REQUIRE(traits::is_parseable_as_container<int[5]>::value == true);
-    }
+        SECTION("of supported STL containers")
+        {
+            REQUIRE(traits::is_parseable_as_container<std::map<int, float>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::multimap<int, float>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::unordered_map<int, float>>::value == true);
+            REQUIRE(traits::is_parseable_as_container<std::unordered_multimap<int, float>>::value == true);
+        }
 
-    SECTION("Detect inherited parseable container type.")
-    {
-        REQUIRE(traits::is_parseable_as_container<vector_wrapper<int>>::value == true);
+        SECTION("containers with C array at some level")
+        {
+            SECTION("CharT[][]",
+                    "(example char type = char)")
+            {
+                REQUIRE(traits::is_parseable_as_container<char[2][2]>::value == true);
+            }
+
+            SECTION("NonCharT[][]")
+            {
+                REQUIRE(traits::is_parseable_as_container<int[2][2]>::value == true);
+            }
+
+            SECTION("StlContainerT<>[]")
+            {
+                REQUIRE(traits::is_parseable_as_container<std::vector<int>[2]>::value == true);
+            }
+
+            SECTION("StlContainerType<Type[]>")
+            {
+                REQUIRE(traits::is_parseable_as_container<std::vector<int[2]>>::value == true);
+            }
+        }
     }
 }
 
-TEST_CASE("Traits: detect types not parseable (input stream extractable) as containers",
+TEST_CASE("Traits: detect as not parseable (input stream extractable)",
           "[traits][input]")
 {
-    SECTION("Detect C-like array of char type as not being a parseable container type")
+    SECTION("containers interpretable as strings")
     {
         REQUIRE(traits::is_parseable_as_container<char[5]>::value == false);
-    }
-
-    SECTION("Detect STL strings as not being parseable container types")
-    {
         REQUIRE(traits::is_parseable_as_container<std::basic_string<char>>::value == false);
 #if __cplusplus >= 201703L
         REQUIRE(traits::is_parseable_as_container<std::basic_string_view<char>>::value == false);
 #endif
     }
 
-    SECTION("Detect STL stacks and single-ended queues as not being parseable container types")
+    SECTION("STL containers that are not iterable")
     {
         REQUIRE(traits::is_parseable_as_container<std::stack<int>>::value == false);
         REQUIRE(traits::is_parseable_as_container<std::queue<int>>::value == false);
         REQUIRE(traits::is_parseable_as_container<std::priority_queue<int>>::value == false);
     }
 
-    SECTION("Detect inherited unparseable container type.")
+    SECTION("custom non-iterable container class",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
     {
         REQUIRE(traits::is_parseable_as_container<stack_wrapper<int>>::value == false);
     }
 }
 
-TEST_CASE("Traits: detect printable (output stream insertable) container types",
+TEST_CASE("Traits: detect as printable (output stream insertable)",
           "[traits][output]")
 {
-    SECTION("Detect most STL containers as being printable container types")
+    SECTION("non-nested")
     {
-        REQUIRE(traits::is_printable_as_container<std::array<int, 5>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::vector<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::pair<int, double>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::tuple<int, double, float>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::deque<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::forward_list<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::list<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::set<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::multiset<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::map<int, float>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::multimap<int, float>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::unordered_set<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::unordered_multiset<int>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::unordered_map<int, float>>::value == true);
-        REQUIRE(traits::is_printable_as_container<std::unordered_multimap<int, float>>::value == true);
+        SECTION("C arrays of non-char type")
+        {
+            REQUIRE(traits::is_printable_as_container<int[5]>::value == true);
+        }
+
+        SECTION("supported STL containers")
+        {
+            REQUIRE(traits::is_printable_as_container<std::array<int, 5>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::vector<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::pair<int, double>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::tuple<int, double, float>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::deque<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::forward_list<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::list<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::set<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::multiset<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::unordered_set<int>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::unordered_multiset<int>>::value == true);
+        }
+
+        SECTION("custom iterable container class",
+                "(iterable being defiend as having members (typename)iterator, "
+                "begin(), end(), and empty())")
+        {
+            REQUIRE(traits::is_printable_as_container<vector_wrapper<int>>::value == true);
+        }
     }
 
-    SECTION("Detect C-like array of non-char type as being a printable container type")
+    SECTION("nesting")
     {
-        REQUIRE(traits::is_printable_as_container<int[5]>::value == true);
-    }
+        SECTION("of supported STL containers")
+        {
+            REQUIRE(traits::is_printable_as_container<std::map<int, float>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::multimap<int, float>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::unordered_map<int, float>>::value == true);
+            REQUIRE(traits::is_printable_as_container<std::unordered_multimap<int, float>>::value == true);
+        }
 
-    SECTION("Detect inherited printable container type.")
-    {
-        REQUIRE(traits::is_printable_as_container<vector_wrapper<int>>::value == true);
+        SECTION("containers with C array at some level")
+        {
+            SECTION("CharT[][]",
+                    "(example char type = char)")
+            {
+                REQUIRE(traits::is_printable_as_container<char[2][2]>::value == true);
+            }
+
+            SECTION("NonCharT[][]")
+            {
+                REQUIRE(traits::is_printable_as_container<int[2][2]>::value == true);
+            }
+
+            SECTION("StlContainerT<>[]")
+            {
+                REQUIRE(traits::is_printable_as_container<std::vector<int>[2]>::value == true);
+            }
+
+            SECTION("StlContainerType<Type[]>")
+            {
+                REQUIRE(traits::is_printable_as_container<std::vector<int[2]>>::value == true);
+            }
+        }
     }
 }
 
-TEST_CASE("Traits: detect types not printable (output stream insertable) as containers",
+TEST_CASE("Traits: detect as not printable (output stream insertable)",
           "[traits][output]")
 {
-    SECTION("Detect C-like array of char type as not being a printable container type")
+    SECTION("containers interpretable as strings")
     {
         REQUIRE(traits::is_printable_as_container<char[5]>::value == false);
-    }
-
-    SECTION("Detect STL strings as not being printable container types")
-    {
         REQUIRE(traits::is_printable_as_container<std::basic_string<char>>::value == false);
 #if __cplusplus >= 201703L
         REQUIRE(traits::is_printable_as_container<std::basic_string_view<char>>::value == false);
 #endif
     }
 
-    SECTION("Detect STL stacks and single-ended queues as not being printable container types")
+    SECTION("STL containers that are not iterable")
     {
         REQUIRE(traits::is_printable_as_container<std::stack<int>>::value == false);
         REQUIRE(traits::is_printable_as_container<std::queue<int>>::value == false);
         REQUIRE(traits::is_printable_as_container<std::priority_queue<int>>::value == false);
     }
 
-    SECTION("Detect inherited unprintable container type")
+    SECTION("custom non-iterable container class",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
     {
         REQUIRE(traits::is_printable_as_container<stack_wrapper<int>>::value == false);
     }
@@ -257,7 +324,8 @@ TEST_CASE("Traits: detect string types", "[traits]")
         REQUIRE(traits::is_string_variant<int[5]>::value == false);
     }
 
-    SECTION("Fail to detect char type C arrays as strings (expecting their decay to pointers)")
+    SECTION("Fail to detect char type C arrays as strings",
+            "(expects their decay to pointers)")
     {
         REQUIRE(traits::is_string_variant<char[5]>::value == false);
         REQUIRE(traits::is_string_variant<const char[5]>::value == false);
