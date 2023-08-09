@@ -67,7 +67,9 @@ private:
 
 template <typename Type>
 class vector_wrapper : public std::vector<Type>
-{};
+{
+    using std::vector<Type>::vector;
+};
 
 template <typename Type>
 class stack_wrapper : public std::stack<Type>
@@ -342,7 +344,7 @@ TEST_CASE("Traits: detect emplace methods", "[traits]")
     REQUIRE(traits::has_emplace_back<int>::value == false);
 }
 */
-
+/*
 TEST_CASE("strings::literal() printing/output streaming escaped literals",
           "[literal][strings][output]")
 {
@@ -1360,11 +1362,11 @@ TEST_CASE("Strings: parsing/input streaming string types inside compatible "
         REQUIRE(vs == std::vector<std::string> { { "tes\t" } });
     }
 }
-
+*/
 /*
-TEST_CASE("Delimiters: validate char defaults", "[decorator]")
+TEST_CASE("Delimiters: validate char defaults for", "[decorator]")
 {
-    SECTION("Verify char delimiters for a non-specialized container type")
+    SECTION("non-specialized container type")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char>::values };
@@ -1375,7 +1377,7 @@ TEST_CASE("Delimiters: validate char defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     "]" ));
     }
 
-    SECTION("Verify char delimiters for a std::set<...>")
+    SECTION("std::set<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1387,7 +1389,7 @@ TEST_CASE("Delimiters: validate char defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     "}" ));
     }
 
-    SECTION("Verify char delimiters for a std::pair<...>")
+    SECTION("std::pair<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1399,7 +1401,7 @@ TEST_CASE("Delimiters: validate char defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     ")" ));
     }
 
-    SECTION("Verify char delimiters for a std::tuple<...>")
+    SECTION("std::tuple<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1412,9 +1414,9 @@ TEST_CASE("Delimiters: validate char defaults", "[decorator]")
     }
 }
 
-TEST_CASE("Delimiters: validate wchar_t defaults", "[decorator]")
+TEST_CASE("Delimiters: validate wchar_t defaults for", "[decorator]")
 {
-    SECTION("Verify wchar_t delimiters for a non-specialized container type")
+    SECTION("non-specialized container type")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], wchar_t>::values };
@@ -1425,7 +1427,7 @@ TEST_CASE("Delimiters: validate wchar_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"]" ));
     }
 
-    SECTION("Verify wchar_t delimiters for a std::set<...>")
+    SECTION("std::set<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1437,7 +1439,7 @@ TEST_CASE("Delimiters: validate wchar_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     L"}" ));
     }
 
-    SECTION("Verify wchar_t delimiters for a std::pair<...>")
+    SECTION("std::pair<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1449,7 +1451,7 @@ TEST_CASE("Delimiters: validate wchar_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     L")" ));
     }
 
-    SECTION("Verify wchar_t delimiters for a std::tuple<...>")
+    SECTION("std::tuple<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1463,9 +1465,9 @@ TEST_CASE("Delimiters: validate wchar_t defaults", "[decorator]")
 }
 
 #if __cplusplus > 201703L
-TEST_CASE("Delimiters: validate char8_t defaults", "[decorator]")
+TEST_CASE("Delimiters: validate char8_t defaults for", "[decorator]")
 {
-    SECTION("Verify char8_t delimiters for a non-specialized container type")
+    SECTION("non-specialized container type")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char8_t>::values };
@@ -1476,7 +1478,7 @@ TEST_CASE("Delimiters: validate char8_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"]" ));
     }
 
-    SECTION("Verify char8_t delimiters for a std::set<...>")
+    SECTION("std::set<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1488,7 +1490,7 @@ TEST_CASE("Delimiters: validate char8_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8"}" ));
     }
 
-    SECTION("Verify char8_t delimiters for a std::pair<...>")
+    SECTION("std::pair<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1500,7 +1502,7 @@ TEST_CASE("Delimiters: validate char8_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u8")" ));
     }
 
-    SECTION("Verify char8_t delimiters for a std::tuple<...>")
+    SECTION("std::tuple<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1514,9 +1516,9 @@ TEST_CASE("Delimiters: validate char8_t defaults", "[decorator]")
 }
 #endif  // above C++17
 
-TEST_CASE("Delimiters: validate char16_t defaults", "[decorator]")
+TEST_CASE("Delimiters: validate char16_t defaults for", "[decorator]")
 {
-    SECTION("Verify char16_t delimiters for a non-specialized container type")
+    SECTION("non-specialized container type")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char16_t>::values };
@@ -1527,7 +1529,7 @@ TEST_CASE("Delimiters: validate char16_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"]" ));
     }
 
-    SECTION("Verify char16_t delimiters for a std::set<...>")
+    SECTION("std::set<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1539,7 +1541,7 @@ TEST_CASE("Delimiters: validate char16_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u"}" ));
     }
 
-    SECTION("Verify char16_t delimiters for a std::pair<...>")
+    SECTION("std::pair<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1551,7 +1553,7 @@ TEST_CASE("Delimiters: validate char16_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     u")" ));
     }
 
-    SECTION("Verify char16_t delimiters for a std::tuple<...>")
+    SECTION("std::tuple<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1564,9 +1566,9 @@ TEST_CASE("Delimiters: validate char16_t defaults", "[decorator]")
     }
 }
 
-TEST_CASE("Delimiters: validate char32_t defaults", "[decorator]")
+TEST_CASE("Delimiters: validate char32_t defaults for", "[decorator]")
 {
-    SECTION("Verify char32_t delimiters for a non-specialized container type")
+    SECTION("non-specialized container type")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<int[], char32_t>::values };
@@ -1577,7 +1579,7 @@ TEST_CASE("Delimiters: validate char32_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"]" ));
     }
 
-    SECTION("Verify char32_t delimiters for a std::set<...>")
+    SECTION("std::set<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1589,7 +1591,7 @@ TEST_CASE("Delimiters: validate char32_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     U"}" ));
     }
 
-    SECTION("Verify char32_t delimiters for a std::pair<...>")
+    SECTION("std::pair<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1601,7 +1603,7 @@ TEST_CASE("Delimiters: validate char32_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     U")" ));
     }
 
-    SECTION("Verify char32_t delimiters for a std::tuple<...>")
+    SECTION("std::tuple<...>")
     {
         constexpr auto delimiters {
             container_stream_io::decorator::delimiters<
@@ -1613,274 +1615,215 @@ TEST_CASE("Delimiters: validate char32_t defaults", "[decorator]")
         REQUIRE(idiomatic_strcmp(delimiters.suffix,     U">" ));
     }
 }
+*/
 
-TEST_CASE("Printing of Raw Arrays")
+TEST_CASE("Printing/output streaming non-nested container types",
+          "[output]")
 {
-    std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-#else
-    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
-#endif
-
-    std::wstringstream wide_buffer;
-    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-#else
-    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
-#endif
-
-    SECTION("Printing a narrow character array.")
+    SECTION("does not support CharType[]",
+            "(instead prints with STL operator<<(CharType*))")
     {
-        const auto& array { "Hello" };
-        std::cout << array << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "Hello");
+        std::ostringstream oss;
+        char s[] { "tes\t" };
+        oss << s;
+        REQUIRE(oss.str() == "tes\t");
     }
 
-    SECTION("Printing a wide character array.")
+    SECTION("supports NonCharType[]")
     {
-        const auto& array { L"Hello" };
-        std::wcout << array << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"Hello");
+        std::ostringstream oss;
+        int a[] { 1, 2, 3, 4, 5 };
+        oss << a;
+        REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
     }
 
-    SECTION("Printing an array of ints to a narrow stream.")
+    SECTION("supports STL container")
     {
-        const int array[5] = { 1, 2, 3, 4, 5 };
-        std::cout << array << std::flush;
+        std::ostringstream oss;
 
-        REQUIRE(narrow_buffer.str() == "[1, 2, 3, 4, 5]");
+        SECTION("std::array")
+        {
+            std::array<int, 5> a { 1, 2, 3, 4, 5 };
+            oss << a;
+            REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
+        }
+
+        SECTION("std::vector")
+        {
+            std::vector<int> v { 1, 2, 3, 4, 5 };
+            oss << v;
+            REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
+        }
+
+        SECTION("std::pair")
+        {
+            std::pair<int, double> p { 1, 1.5 };
+            oss << p;
+            REQUIRE(oss.str() == "(1, 1.5)");
+        }
+
+        SECTION("std::tuple")
+        {
+            std::tuple<int, double, short> t { 1, 1.5, 2 };
+            oss << t;
+            REQUIRE(oss.str() == "<1, 1.5, 2>");
+        }
+
+        SECTION("std::deque")
+        {
+            std::deque<int> d { 1, 2, 3, 4, 5 };
+            oss << d;
+            REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
+        }
+
+        SECTION("std::forward_list")
+        {
+            std::forward_list<int> fl { 1, 2, 3, 4, 5 };
+            oss << fl;
+            REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
+        }
+
+        SECTION("std::list")
+        {
+            std::list<int> l { 1, 2, 3, 4, 5 };
+            oss << l;
+            REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
+        }
+
+        SECTION("std::set")
+        {
+            std::set<int> s { 1, 2, 3, 4, 5 };
+            oss << s;
+            REQUIRE(oss.str() == "{1, 2, 3, 4, 5}");
+        }
+
+        SECTION("std::multiset")
+        {
+            std::multiset<int> ms { 1, 2, 3, 4, 5 };
+            oss << ms;
+            REQUIRE(oss.str() == "{1, 2, 3, 4, 5}");
+        }
+
+        SECTION("std::unordered_set",
+                "(unordered by definition, so serialization can be unpredictable - "
+                "testable here due to how often order is reverse of insertion order)")
+        {
+            std::unordered_set<int> us { 1, 2, 3, 4, 5 };
+            oss << us;
+            REQUIRE(oss.str() == "[5, 4, 3, 2, 1]");
+        }
+
+        SECTION("std::unordered_multiset",
+                "(unordered by definition, so serialization can be unpredictable - "
+                "testable here due to how often order is reverse of insertion order)")
+        {
+            std::unordered_multiset<int> ums { 1, 2, 3, 4, 5 };
+            oss << ums;
+            REQUIRE(oss.str() == "[5, 4, 3, 2, 1]");
+        }
     }
 
-    SECTION("Printing an array of ints to a wide stream.")
+    SECTION("supports custom container classes, provided they are iterable",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
     {
-        const int array[5] = { 1, 2, 3, 4, 5 };
-        std::wcout << array << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"[1, 2, 3, 4, 5]");
+        std::ostringstream oss;
+        vector_wrapper<int> vri { { 1, 2, 3, 4, 5 } };
+        oss << vri;
+        REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
     }
 }
 
-
-TEST_CASE("Printing of Standard Library Containers")
+TEST_CASE("Printing/output streaming nested container types",
+          "[output]")
 {
-    std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-#else
-    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
-#endif
-
-    std::wstringstream wide_buffer;
-    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-#else
-    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
-#endif
-
-    SECTION("Printing a std::pair<...> to a narrow stream.")
+    SECTION("supports C arrays in nesting configurations like")
     {
-        const auto pair { std::make_pair(10, 100) };
-        std::cout << pair << std::flush;
+        std::ostringstream oss;
 
-        REQUIRE(narrow_buffer.str() == "(10, 100)");
+        SECTION("CharType[][] !!! currently failing with elements not printed using literal()",
+                "(considered array of char*)")
+        {
+            char sa[2][5] { { "tes\t" }, { "\test" } };
+            oss << sa;
+            REQUIRE(oss.str() == "[\"tes\\t\", \"\\test\"]");
+        }
+
+        SECTION("NonCharType[][]")
+        {
+            int aa[2][3] { { 1, 2, 3 }, { 4, 5, 6 } };
+            oss << aa;
+            REQUIRE(oss.str() == "[[1, 2, 3], [4, 5, 6]]");
+        }
+
+        SECTION("StlContainerType<>[]")
+        {
+            std::vector<int> av[] { { 1, 2, 3 }, { 4, 5, 6 } };
+            oss << av;
+            REQUIRE(oss.str() == "[[1, 2, 3], [4, 5, 6]]");
+        }
+
+        SECTION("StlContainerType<Type[]>")
+        {
+            std::ostringstream oss;
+            // bracketed initializer lists not successful
+            std::vector<int[3]> va { 2 };
+            va[0][0] = 1; va[0][1] = 2; va[0][2] = 3;
+            va[1][0] = 4; va[1][1] = 5; va[1][2] = 6;
+            oss << va;
+            REQUIRE(oss.str() == "[[1, 2, 3], [4, 5, 6]]");
+        }
     }
 
-    SECTION("Printing a std::pair<...> to a wide stream.")
+    SECTION("supports STL container combinations like")
     {
-        const auto pair { std::make_pair(10, 100) };
-        std::wcout << pair << std::flush;
+        std::ostringstream oss;
 
-        REQUIRE(wide_buffer.str() == L"(10, 100)");
+        SECTION("std::map")
+        {
+            std::map<int, float> s { { 1, 1.5 }, { 2, 2.5 } };
+            oss << s;
+            REQUIRE(oss.str() == "[(1, 1.5), (2, 2.5)]");
+        }
+
+        SECTION("std::multimap")
+        {
+            std::multimap<int, float> ms { { 1, 1.5 }, { 2, 2.5 } };
+            oss << ms;
+            REQUIRE(oss.str() == "[(1, 1.5), (2, 2.5)]");
+        }
+
+        SECTION("std::unordered_map",
+                "(unordered by definition, so serialization can be unpredictable - "
+                "testable here due to how often order is reverse of insertion order)")
+        {
+            std::unordered_map<int, float> us { { 1, 1.5 }, { 2, 2.5 } };
+            oss << us;
+            REQUIRE(oss.str() == "[(2, 2.5), (1, 1.5)]");
+        }
+
+        SECTION("std::unordered_multimap",
+                "(unordered by definition, so serialization can be unpredictable - "
+                "testable here due to how often order is reverse of insertion order)")
+        {
+            std::unordered_multimap<int, float> ums { { 1, 1.5 }, { 2, 2.5 } };
+            oss << ums;
+            REQUIRE(oss.str() == "[(2, 2.5), (1, 1.5)]");
+        }
     }
 
-    SECTION("Printing an empty std::vector<...> to a wide stream.")
+    SECTION("supports custom container classes, provided they are iterable",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
     {
-        const std::vector<int> vector{};
-        std::wcout << vector << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"[]");
-    }
-
-    SECTION("Printing a populated std::vector<...> to a narrow stream.")
-    {
-        const std::vector<int> vector { 1, 2, 3, 4 };
-        std::cout << vector << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "[1, 2, 3, 4]");
-    }
-
-    SECTION("Printing a populated std::vector<...> to a wide stream.")
-    {
-        const std::vector<int> vector { 1, 2, 3, 4 };
-        std::wcout << vector << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"[1, 2, 3, 4]");
-    }
-
-    SECTION("Printing an empty std::set<...> to a narrow stream.")
-    {
-        const std::set<int> set {};
-        std::cout << set << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "{}");
-    }
-
-    SECTION("Printing an empty std::set<...> to a wide stream.")
-    {
-        const std::set<int> set {};
-        std::wcout << set << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"{}");
-    }
-
-    SECTION("Printing a populated std::set<...> to a narrow stream.")
-    {
-        const std::set<int> set { 1, 2, 3, 4 };
-        std::cout << set << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
-    }
-
-    SECTION("Printing a populated std::set<...> to a wide stream.")
-    {
-        const std::set<int> set { 1, 2, 3, 4 };
-        std::wcout << set << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
-    }
-
-    SECTION("Printing a populated std::multiset<...> to a narrow stream.")
-    {
-        const std::multiset<int> multiset { 1, 2, 3, 4 };
-        std::cout << multiset << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "{1, 2, 3, 4}");
-    }
-
-    SECTION("Printing a populated std::multiset<...> to a wide stream.")
-    {
-        const std::multiset<int> multiset { 1, 2, 3, 4 };
-        std::wcout << multiset << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"{1, 2, 3, 4}");
-    }
-
-    SECTION("Printing an empty std::tuple<...> to a narrow stream.")
-    {
-        const auto tuple { std::make_tuple() };
-        std::cout << tuple << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "<>");
-    }
-
-    SECTION("Printing an empty std::tuple<...> to a wide stream.")
-    {
-        const auto tuple { std::make_tuple() };
-        std::wcout << tuple << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"<>");
-    }
-
-    SECTION("Printing a populated std::tuple<...> to a narrow stream.")
-    {
-        const auto tuple { std::make_tuple(1, 2, 3, 4, 5) };
-        std::cout << tuple << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "<1, 2, 3, 4, 5>");
-    }
-
-    SECTION("Printing a populated std::tuple<...> to a wide stream.")
-    {
-        const auto tuple { std::make_tuple(1, 2, 3, 4, 5) };
-        std::wcout << tuple << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"<1, 2, 3, 4, 5>");
+        std::ostringstream oss;
+        vector_wrapper<vector_wrapper<int>> vrvri { { 1, 2, 3 }, { 4, 5, 6 } };
+        oss << vrvri;
+        REQUIRE(oss.str() == "[[1, 2, 3], [4, 5, 6]]");
     }
 }
 
-TEST_CASE("Printing of Nested Containers")
-{
-    std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-#else
-    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
-#endif
-
-    std::wstringstream wide_buffer;
-    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-#else
-    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
-#endif
-
-    SECTION("Printing a populated std::map<...> to a narrow stream.")
-    {
-        const auto map { std::map<int, std::string> {
-                { 1, "Template" }, { 2, "Meta" }, { 3, "Programming" } } };
-
-        std::cout << map << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "[(1, \"Template\"), (2, \"Meta\"), (3, \"Programming\")]");
-    }
-
-    SECTION("Printing a populated std::map<...> to a wide stream.")
-    {
-        const auto map { std::map<int, std::wstring>{
-                { 1, L"Template" }, { 2, L"Meta" }, { 3, L"Programming" } } };
-
-        std::wcout << map << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"[(1, L\"Template\"), (2, L\"Meta\"), (3, L\"Programming\")]");
-    }
-
-    SECTION("Printing a populated std::vector<std::tuple<...>> to a narrow stream.")
-    {
-        const auto vector { std::vector<std::tuple<int, double, std::string>>{
-                std::make_tuple(1, 0.1, "Hello"), std::make_tuple(2, 0.2, "World") } };
-
-        std::cout << vector << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "[<1, 0.1, \"Hello\">, <2, 0.2, \"World\">]");
-    }
-
-    SECTION("Printing a populated std::vector<std::tuple<...>> to a wide stream.")
-    {
-        const auto vector { std::vector<std::tuple<int, double, std::wstring>>{
-                std::make_tuple(1, 0.1, L"Hello"), std::make_tuple(2, 0.2, L"World") } };
-
-        std::wcout << vector << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"[<1, 0.1, L\"Hello\">, <2, 0.2, L\"World\">]");
-    }
-
-    SECTION("Printing a populated std::pair<int, std::vector<std::pair<std::string, std::string>>>")
-    {
-        const auto pair { std::make_pair(
-                10, std::vector<std::pair<std::string, std::string>> {
-                    std::make_pair("Why", "Not?"), std::make_pair("Someone", "Might!") }) };
-
-        std::cout << pair << std::flush;
-
-        REQUIRE(narrow_buffer.str() == "(10, [(\"Why\", \"Not?\"), (\"Someone\", \"Might!\")])");
-    }
-}
-
+/*
 TEST_CASE("Printing with Custom Formatters")
 {
     std::stringstream narrow_buffer;
