@@ -2303,49 +2303,35 @@ TEST_CASE("Supported container types should not change after being encoded and "
     }
 }
 
-/*
-TEST_CASE("Printing with Custom Formatters")
+TEST_CASE("Printing with custom formatter",
+          "[output]")
 {
-    std::stringstream narrow_buffer;
-    auto* const old_narrow_buffer { std::cout.rdbuf(narrow_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_narrow_buffer { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-#else
-    const auto narrow_lambda { [&]() noexcept { std::cout.rdbuf(old_narrow_buffer); } };
-    const scope_exit<decltype(narrow_lambda)> reset_narrow_buffer { std::move(narrow_lambda) };
-#endif
-
-    std::wstringstream wide_buffer;
-    auto* const old_wide_buffer { std::wcout.rdbuf(wide_buffer.rdbuf()) };
-#if __cplusplus >= 201703L
-    const scope_exit reset_wide_buffer { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-#else
-    const auto wide_lambda { [&]() noexcept { std::wcout.rdbuf(old_wide_buffer); } };
-    const scope_exit<decltype(wide_lambda)> reset_wide_buffer { std::move(wide_lambda) };
-#endif
-
-    SECTION("Printing a populated std::vector<...> to a wide stream.")
+    SECTION("to wide stream")
     {
-        const auto container { std::vector<int>{ 1, 2, 3, 4 } };
-        container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
+        std::wostringstream woss;
 
-        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
-    }
+        SECTION("std::vector")
+        {
+            const auto container { std::vector<int>{ 1, 2, 3, 4 } };
+            container_stream_io::output::to_stream(
+                woss, container, custom_formatter{}) << std::flush;
+            REQUIRE(woss.str() == L"$$ 1 | 2 | 3 | 4 $$");
+        }
 
-    SECTION("Printing a populated std::tuple<...> to a wide stream.")
-    {
-        const auto container { std::make_tuple(1, 2, 3, 4) };
-        container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
+        SECTION("std::tuple<>")
+        {
+            const auto container { std::tuple<int, double, short>{ 1, 1.5, 2 } };
+            container_stream_io::output::to_stream(
+                woss, container, custom_formatter{}) << std::flush;
+            REQUIRE(woss.str() == L"$$ 1 | 1.5 | 2 $$");
+        }
 
-        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 | 3 | 4 $$");
-    }
-
-    SECTION("Printing a populated std::pair<...> to a wide stream.")
-    {
-        const auto container { std::make_pair(1, 2) };
-        container_stream_io::output::to_stream(std::wcout, container, custom_formatter{}) << std::flush;
-
-        REQUIRE(wide_buffer.str() == L"$$ 1 | 2 $$");
+        SECTION("std::pair")
+        {
+            const auto container { std::pair<int, double> { 1, 1.5 } };
+            container_stream_io::output::to_stream(
+                woss, container, custom_formatter{}) << std::flush;
+            REQUIRE(woss.str() == L"$$ 1 | 1.5 $$");
+        }
     }
 }
-*/
