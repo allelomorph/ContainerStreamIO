@@ -1781,15 +1781,15 @@ TEST_CASE("Printing/output streaming nested container types",
 
         SECTION("std::map")
         {
-            std::map<int, float> s { { 1, 1.5 }, { 2, 2.5 } };
-            oss << s;
+            std::map<int, float> m { { 1, 1.5 }, { 2, 2.5 } };
+            oss << m;
             REQUIRE(oss.str() == "[(1, 1.5), (2, 2.5)]");
         }
 
         SECTION("std::multimap")
         {
-            std::multimap<int, float> ms { { 1, 1.5 }, { 2, 2.5 } };
-            oss << ms;
+            std::multimap<int, float> mm { { 1, 1.5 }, { 2, 2.5 } };
+            oss << mm;
             REQUIRE(oss.str() == "[(1, 1.5), (2, 2.5)]");
         }
 
@@ -1797,8 +1797,8 @@ TEST_CASE("Printing/output streaming nested container types",
                 "(unordered by definition, so serialization can be unpredictable - "
                 "testable here due to how often order is reverse of insertion order)")
         {
-            std::unordered_map<int, float> us { { 1, 1.5 }, { 2, 2.5 } };
-            oss << us;
+            std::unordered_map<int, float> um { { 1, 1.5 }, { 2, 2.5 } };
+            oss << um;
             REQUIRE(oss.str() == "[(2, 2.5), (1, 1.5)]");
         }
 
@@ -1806,8 +1806,8 @@ TEST_CASE("Printing/output streaming nested container types",
                 "(unordered by definition, so serialization can be unpredictable - "
                 "testable here due to how often order is reverse of insertion order)")
         {
-            std::unordered_multimap<int, float> ums { { 1, 1.5 }, { 2, 2.5 } };
-            oss << ums;
+            std::unordered_multimap<int, float> umm { { 1, 1.5 }, { 2, 2.5 } };
+            oss << umm;
             REQUIRE(oss.str() == "[(2, 2.5), (1, 1.5)]");
         }
     }
@@ -1817,9 +1817,250 @@ TEST_CASE("Printing/output streaming nested container types",
             "begin(), end(), and empty())")
     {
         std::ostringstream oss;
-        vector_wrapper<vector_wrapper<int>> vrvri { { 1, 2, 3 }, { 4, 5, 6 } };
-        oss << vrvri;
+        vector_wrapper<vector_wrapper<int>> vrvr { { 1, 2, 3 }, { 4, 5, 6 } };
+        oss << vrvr;
         REQUIRE(oss.str() == "[[1, 2, 3], [4, 5, 6]]");
+    }
+}
+
+TEST_CASE("Parsing/input streaming non-nested container types",
+          "[input]")
+{
+    SECTION("does not support CharType[]",
+            "(instead parses with STL operator>>(CharType*))")
+    {
+        std::istringstream iss { "test" };
+        char s[5];
+        iss >> s;
+#if (__cplusplus < 201703L)
+        REQUIRE(std::string(s) == "test");
+#else
+        REQUIRE(std::string_view(s) == "test");
+#endif
+    }
+
+    SECTION("supports NonCharType[]")
+    {
+        std::istringstream iss { "[1, 2, 3]" };
+        int a[3];
+        iss >> a;
+        REQUIRE(a[0] == 1);
+        REQUIRE(a[1] == 2);
+        REQUIRE(a[2] == 3);
+    }
+
+    SECTION("supports STL container")
+    {
+        std::istringstream iss;
+
+        SECTION("std::array")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::array<int, 5> a;
+            iss >> a;
+            REQUIRE(a == std::array<int, 5>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::vector")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::vector<int> v;
+            iss >> v;
+            REQUIRE(v == std::vector<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::pair")
+        {
+            iss.str("(1, 1.5)");
+            std::pair<int, double> p;
+            iss >> p;
+            REQUIRE(p == std::pair<int, double>{ 1, 1.5 });
+        }
+
+        SECTION("std::tuple")
+        {
+            iss.str("<1, 1.5, 2>");
+            std::tuple<int, double, short> t;
+            iss >> t;
+            REQUIRE(t == std::tuple<int, double, short>{ 1, 1.5, 2 });
+        }
+
+        SECTION("std::deque")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::deque<int> d;
+            iss >> d;
+            REQUIRE(d == std::deque<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::forward_list")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::forward_list<int> fl;
+            iss >> fl;
+            REQUIRE(fl == std::forward_list<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::list")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::list<int> l;
+            iss >> l;
+            REQUIRE(l == std::list<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::set")
+        {
+            iss.str("{1, 2, 3, 4, 5}");
+            std::set<int> s;
+            iss >> s;
+            REQUIRE(s == std::set<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::multiset")
+        {
+            iss.str("{1, 2, 3, 4, 5}");
+            std::multiset<int> ms;
+            iss >> ms;
+            REQUIRE(ms == std::multiset<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::unordered_set",
+                "(unordered by definition, so relationship between element order "
+                "in serialization and extracted order is unpredictable)")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::unordered_set<int> us;
+            iss >> us;
+            REQUIRE(us == std::unordered_set<int>{ 1, 2, 3, 4, 5 });
+        }
+
+        SECTION("std::unordered_multiset",
+                "(unordered by definition, so relationship between element order "
+                "in serialization and extracted order is unpredictable)")
+        {
+            iss.str("[1, 2, 3, 4, 5]");
+            std::unordered_multiset<int> ums;
+            iss >> ums;
+            REQUIRE(ums == std::unordered_multiset<int>{ 1, 2, 3, 4, 5 });
+        }
+    }
+
+    SECTION("supports custom container classes, provided they are iterable",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
+    {
+        std::istringstream iss { "[1, 2, 3, 4, 5]" };
+        vector_wrapper<int> vr;
+        iss >> vr;
+        REQUIRE(vr == vector_wrapper<int>{ { 1, 2, 3, 4, 5 } });
+    }
+}
+
+TEST_CASE("Parsing/input streaming nested container types",
+          "[input]")
+{
+    SECTION("supports C arrays in nesting configurations like")
+    {
+        std::istringstream iss;
+
+        // !!! why not failing (to use literal()) when equivalent output test fails?
+        SECTION("CharType[][]",
+                "(considered array of char*)")
+        {
+            iss.str("[\"tes\\t\", \"\\test\"]");
+            char sa[2][5];
+            iss >> sa;
+#if (__cplusplus < 201703L)
+            REQUIRE(std::string(sa[0]) == "tes\t");
+            REQUIRE(std::string(sa[1]) == "\test");
+#else
+            REQUIRE(std::string_view(sa[0]) == "tes\t");
+            REQUIRE(std::string_view(sa[1]) == "\test");
+#endif
+        }
+
+        SECTION("NonCharType[][]")
+        {
+            iss.str("[[1, 2], [3, 4]]");
+            int aa[2][2];
+            iss >> aa;
+            REQUIRE(aa[0][0] == 1);
+            REQUIRE(aa[0][1] == 2);
+            REQUIRE(aa[1][0] == 3);
+            REQUIRE(aa[1][1] == 4);
+        }
+
+        SECTION("StlContainerType<>[]")
+        {
+            iss.str("[[1, 2, 3], [4, 5, 6]]");
+            std::vector<int> av[2];
+            iss >> av;
+            REQUIRE(av[0] == std::vector<int>{1, 2, 3});
+            REQUIRE(av[1] == std::vector<int>{4, 5, 6});
+        }
+
+        // !!! can this be remedied with some workaround for T[] members?
+        //   (why does this fail when T[][] works?)
+        SECTION("StlContainerType<Type[]>")
+        {
+            iss.str("[[1, 2], [3, 4]]");
+            std::vector<int[2]> va;
+            // iss >> va;  // won't compile
+            REQUIRE(!std::is_move_constructible<
+                    typename std::vector<int[2]>::value_type>::value);
+        }
+    }
+
+    SECTION("supports STL container combinations like")
+    {
+        std::istringstream iss;
+
+        SECTION("std::map")
+        {
+            iss.str("[(1, 1.5), (2, 2.5)]");
+            std::map<int, float> m;
+            iss >> m;
+            REQUIRE(m == std::map<int, float>{ { 1, 1.5 }, { 2, 2.5 } });
+        }
+
+        SECTION("std::multimap")
+        {
+            iss.str("[(1, 1.5), (2, 2.5)]");
+            std::multimap<int, float> mm;
+            iss >> mm;
+            REQUIRE(mm == std::multimap<int, float>{ { 1, 1.5 }, { 2, 2.5 } });
+        }
+
+        SECTION("std::unordered_map",
+                "(unordered by definition, so relationship between element order "
+                "in serialization and extracted order is unpredictable)")
+        {
+            iss.str("[(2, 2.5), (1, 1.5)]");
+            std::unordered_map<int, float> um;
+            iss >> um;
+            REQUIRE(um == std::unordered_map<int, float>{ { 1, 1.5 }, { 2, 2.5 } });
+        }
+
+        SECTION("std::unordered_multimap",
+                "(unordered by definition, so relationship between element order "
+                "in serialization and extracted order is unpredictable)")
+        {
+            iss.str("[(2, 2.5), (1, 1.5)]");
+            std::unordered_multimap<int, float> umm { { 1, 1.5 }, { 2, 2.5 } };
+            iss >> umm;
+            REQUIRE(umm == std::unordered_multimap<int, float>{ { 1, 1.5 }, { 2, 2.5 } });
+        }
+    }
+
+    SECTION("supports custom container classes, provided they are iterable",
+            "(iterable being defiend as having members (typename)iterator, "
+            "begin(), end(), and empty())")
+    {
+        std::istringstream iss { "[[1, 2, 3], [4, 5, 6]]" };
+        vector_wrapper<vector_wrapper<int>> vrvr { { 1, 2, 3 }, { 4, 5, 6 } };
+        iss >> vrvr;
+        REQUIRE(vrvr == vector_wrapper<vector_wrapper<int>>{ { 1, 2, 3 }, { 4, 5, 6 } });
     }
 }
 
