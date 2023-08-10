@@ -662,30 +662,29 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
                 REQUIRE(iss.fail());
             }
         }
-
-        SECTION("eof value extracted from malformed encoding sets failbit",
-                "(not eofbit as expected, may depend on stream char type)")
+        SECTION("eofbit being set by eof value extracted from malformed encoding "
+                "depends on stream char type")
         {
             iss.clear();
 
             SECTION("EOF")
             {
                 char c;
-                char s[] { "'_'" };
-                s[1] = std::istringstream::traits_type::eof();
+                char s[] { '\'', std::istringstream::traits_type::eof(), '\'', 0 };
                 iss.str(s);
                 iss >> strings::literal(c);
+                // failure due to value outside 7-bit ASCII range, not eof
                 REQUIRE((iss.fail() && !iss.eof()));
             }
 
             SECTION("WEOF")
             {
                 wchar_t wc;
-                wchar_t ws[] { L"'_'" };
-                ws[1] = std::wistringstream::traits_type::eof();
+                wchar_t ws[] { L'L', L'\'', wchar_t(std::wistringstream::traits_type::eof()), L'\'', 0 };
                 std::wistringstream wiss { ws };
                 wiss >> strings::literal(wc);
-                REQUIRE((wiss.fail() && !wiss.eof()));
+                // failbit set along with eofbit
+                REQUIRE((wiss.fail() && wiss.eof()));
             }
         }
     }
@@ -1082,8 +1081,8 @@ TEST_CASE("strings::quoted() parsing/input streaming quoted strings",
             }
         }
 
-        SECTION("eof value extracted from quoted string does not set eofbit as "
-                "expected, and only sets failbit depending on stream char type")
+        SECTION("eofbit being set by eof value extracted from quoted string "
+                "depends on stream char type")
         {
             iss.clear();
 
@@ -1094,15 +1093,16 @@ TEST_CASE("strings::quoted() parsing/input streaming quoted strings",
                 iss.str(s);
                 iss >> strings::quoted(c);
                 REQUIRE(iss.good());
+                REQUIRE(c == std::istringstream::traits_type::eof());
             }
 
             SECTION("WEOF")
             {
                 wchar_t wc;
-                wchar_t ws[] { L'\'', wchar_t(std::wistringstream::traits_type::eof()), L'\'', 0 };
+                wchar_t ws[] { L'L', L'\'', wchar_t(std::wistringstream::traits_type::eof()), L'\'', 0 };
                 std::wistringstream wiss { ws };
                 wiss >> strings::quoted(wc);
-                REQUIRE((wiss.fail() && !wiss.eof()));
+                REQUIRE((wiss.fail() && wiss.eof()));
             }
         }
     }
