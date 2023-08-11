@@ -128,6 +128,31 @@ struct is_string_type :
                                   is_stl_string_type<StringType>::value>
 {};
 
+template <typename Type, typename = void>
+struct has_iterless_emplace : public std::false_type
+{};
+
+// !!! This only tests for overloads that can take no args, eg emplace(args...)
+//   for std::(unordered_)(multi)set and std::(unordered_)(multi)map. Containers
+//   with emplace(const_iterator, args...), eg std::vector, std::list, and
+//   std::deque could, be tested for with
+//   `.emplace(declval<typename Type::const_iterator>())`, see:
+//   detection idiom: https://stackoverflow.com/a/41936999
+//   detection idiom mod for variadics: https://stackoverflow.com/a/35669421
+template <typename Type>
+struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_back : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
+    : public std::true_type
+{};
+
 /**
  * @brief Base case for the testing of STL compatible container types.
  */
@@ -327,31 +352,6 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 {
     return ArraySize == 0;
 }
-
-template <typename Type, typename = void>
-struct has_iterless_emplace : public std::false_type
-{};
-
-// !!! This only tests for overloads that can take no args, eg emplace(args...)
-//   for std::(unordered_)(multi)set and std::(unordered_)(multi)map. Containers
-//   with emplace(const_iterator, args...), eg std::vector, std::list, and
-//   std::deque could, be tested for with
-//   `.emplace(declval<typename Type::const_iterator>())`, see:
-//   detection idiom: https://stackoverflow.com/a/41936999
-//   detection idiom mod for variadics: https://stackoverflow.com/a/35669421
-template <typename Type>
-struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
-    : public std::true_type
-{};
-
-template <typename Type, typename = void>
-struct has_emplace_back : public std::false_type
-{};
-
-template <typename Type>
-struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
-    : public std::true_type
-{};
 
 } // namespace traits
 
@@ -1084,7 +1084,6 @@ inline auto quoted(
 	    string, delim, escape, detail::repr_type::quoted);
 }
 
-// note: using decltype(string) for string_repr<StringType, > fails to assign const reference
 template<typename CharType, typename TraitsType, typename AllocType>
 inline auto quoted(
     const std::basic_string<CharType, TraitsType, AllocType>& string,
@@ -1179,7 +1178,6 @@ inline auto literal(
 	    string, delim, escape, detail::repr_type::literal);
 }
 
-// note: using decltype(string) for string_repr<StringType, > fails to assign const reference
 template<typename CharType, typename TraitsType, typename AllocType>
 inline auto literal(
     const std::basic_string<CharType, TraitsType, AllocType>& string,
@@ -1428,14 +1426,14 @@ struct default_formatter
     }
 };
 
-// TBD is_move_assignable may be redundant here if is_parseable_as_container tests most STL
+// no need to test is_move_assignable here if is_parseable_as_container tests
 //   containers for is_move_constructible
 // std::vector, std::deque, std::list
 template<typename ContainerType, typename ElementType>
-static auto emplace_element(
-    ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-        container_stream_io::traits::has_emplace_back<ContainerType>::value &&
-        std::is_move_assignable<ElementType>::value, void>
+static auto emplace_element(ContainerType& container, const ElementType& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_emplace_back<ContainerType>::value,
+        void>
 {
     container.emplace_back(element);
 }
@@ -1445,35 +1443,39 @@ static auto emplace_element(
 // std::(unordered_)map (redundant keys will have value of first appearance in serialization)
 // std::(unordered_)multiset, std::(unordered_)multimap
 template <typename ContainerType, typename KeyType, typename ValueType>
-static auto emplace_element(
-    ContainerType& container,
-    const std::pair<const KeyType, ValueType>& element) noexcept -> std::enable_if_t<
-        container_stream_io::traits::has_iterless_emplace<ContainerType>::value, void>
+static auto emplace_element(ContainerType& container,
+                            const std::pair<const KeyType, ValueType>& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_iterless_emplace<ContainerType>::value,
+        void>
 {
     container.emplace(element.first, element.second);
 }
 
 // !!? now this is the intended generic
 template <typename ContainerType, typename ElementType>
-static auto emplace_element(
-    ContainerType& container, const ElementType& element) noexcept -> std::enable_if_t<
-        container_stream_io::traits::has_iterless_emplace<ContainerType>::value &&
-        !container_stream_io::traits::has_emplace_back<ContainerType>::value &&
-        std::is_move_assignable<ElementType>::value, void>
+static auto emplace_element(ContainerType& container, const ElementType& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_iterless_emplace<ContainerType>::value &&
+        !traits::has_emplace_back<ContainerType>::value,
+        void>
 {
     container.emplace(element);
 }
 
 // move-assignable (all STL containers (including std::array))
 template<typename ContainerType>
-static auto safer_assign(ContainerType& source, ContainerType& target) -> std::enable_if_t<
-        std::is_move_assignable<ContainerType>::value, void>
+static auto safer_assign(ContainerType& source, ContainerType& target
+    ) -> std::enable_if_t<
+        std::is_move_assignable<ContainerType>::value,
+        void>
 {
     target = std::move(source);
 }
 
 template<typename ElementType, std::size_t ArraySize>
-static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)[ArraySize])
+static void safer_assign(ElementType (&source)[ArraySize],
+                         ElementType (&target)[ArraySize])
 {
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
@@ -1482,7 +1484,6 @@ static void safer_assign(ElementType (&source)[ArraySize], ElementType (&target)
         safer_assign(*s_it, *t_it);
     }
 }
-
 
 // tried enable_if with SFINAE struct is_array which would be true for std::array
 //   and C arrays, but it appeared that the resolution of is_array caused the
