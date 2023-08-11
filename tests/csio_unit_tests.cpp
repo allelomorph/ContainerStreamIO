@@ -170,11 +170,6 @@ TEST_CASE("Traits: detect as parseable (input stream extractable)",
             {
                 REQUIRE(traits::is_parseable_as_container<std::vector<int>[2]>::value == true);
             }
-
-            SECTION("StlContainerType<Type[]>")
-            {
-                REQUIRE(traits::is_parseable_as_container<std::vector<int[2]>>::value == true);
-            }
         }
     }
 }
@@ -182,6 +177,12 @@ TEST_CASE("Traits: detect as parseable (input stream extractable)",
 TEST_CASE("Traits: detect as not parseable (input stream extractable)",
           "[traits][input]")
 {
+    SECTION("StlContainerT<T[]>",
+            "(C arrays are not move-assignable/constructible)")
+    {
+        REQUIRE(traits::is_parseable_as_container<std::vector<int[2]>>::value == false);
+    }
+
     SECTION("containers interpretable as strings")
     {
         REQUIRE(traits::is_parseable_as_container<char[5]>::value == false);
@@ -267,7 +268,7 @@ TEST_CASE("Traits: detect as printable (output stream insertable)",
                 REQUIRE(traits::is_printable_as_container<std::vector<int>[2]>::value == true);
             }
 
-            SECTION("StlContainerType<Type[]>")
+            SECTION("StlContainerT<T[]>")
             {
                 REQUIRE(traits::is_printable_as_container<std::vector<int[2]>>::value == true);
             }
@@ -1775,7 +1776,7 @@ TEST_CASE("Printing/output streaming nested container types",
     {
         std::ostringstream oss;
 
-        SECTION("CharType[][] !!! currently failing with elements not printed using literal()",
+        SECTION("CharType[][]",
                 "(considered array of char*)")
         {
             char sa[2][5] { { "tes\t" }, { "\test" } };
@@ -1994,7 +1995,6 @@ TEST_CASE("Parsing/input streaming nested container types",
     {
         std::istringstream iss;
 
-        // !!! why not failing (to use literal()) when equivalent output test fails?
         SECTION("CharType[][]",
                 "(considered array of char*)")
         {
@@ -2024,17 +2024,14 @@ TEST_CASE("Parsing/input streaming nested container types",
             REQUIRE(av[0] == std::vector<int>{1, 2, 3});
             REQUIRE(av[1] == std::vector<int>{4, 5, 6});
         }
+    }
 
-        // !!! can this be remedied with some workaround for T[] members?
-        //   (why does this fail when T[][] works?)
-        SECTION("StlContainerType<Type[]>")
-        {
-            iss.str("[[1, 2], [3, 4]]");
-            std::vector<int[2]> va;
-            // iss >> va;  // won't compile
-            REQUIRE(!std::is_move_constructible<
+    SECTION("does not support C arrays as STL container members (StlContainerType<[]>)",
+            "(extraction of STL containers relies variants of emplace(), "
+            "which requires elements to be move-assignable/constructible)")
+    {
+        REQUIRE(!std::is_move_constructible<
                     typename std::vector<int[2]>::value_type>::value);
-        }
     }
 
     SECTION("supports STL container combinations like")
@@ -2227,7 +2224,7 @@ TEST_CASE("Supported container types should not change after being encoded and "
     {
         std::stringstream ss;
 
-        SECTION("CharType[][] !!! currently failing with elements not printed using literal()",
+        SECTION("CharType[][]",
                 "(considered array of char*)")
         {
             char sa[2][5] { { "tes\t" }, { "\test" } };
@@ -2260,21 +2257,6 @@ TEST_CASE("Supported container types should not change after being encoded and "
             REQUIRE(_av[1] == av[1]);
         }
 
-        // TBD fix istreaming into containers with non-move-constructible elements
-        // SECTION("StlContainerType<Type[]>")
-        // {
-        //     // bracketed initializer lists not successful
-        //     std::vector<int[2]> va { 2 };
-        //     va[0][0] = 1; va[0][1] = 2;
-        //     va[1][0] = 3; va[1][1] = 4;
-        //     ss << va;
-        //     std::vector<int[2]> _va { 2 };
-        //     // ss >> _va;  // won't compile
-        //     REQUIRE(_aa[0][0] == aa[0][0]);
-        //     REQUIRE(_aa[0][1] == aa[0][1]);
-        //     REQUIRE(_aa[1][0] == aa[1][0]);
-        //     REQUIRE(_aa[1][1] == aa[1][1]);
-        // }
     }
 
     SECTION("with nested STL container combinations like")
