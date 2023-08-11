@@ -1025,6 +1025,9 @@ std::basic_ios<CharacterType, TraitsType>& quotedrepr(
  * @param delim  Character to quote string with.
  * @param escape Escape character to escape itself or quote character.
  */
+// it may seem verbose to have this full list of overloads, but given that
+//   delim and escape types need to be deducible from and match the char type
+//   in c/string, there are challenges in further template generalization
 template<typename CharType>
 inline auto quoted(
     CharType& c,
