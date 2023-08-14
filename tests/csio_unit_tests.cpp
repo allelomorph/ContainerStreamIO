@@ -403,16 +403,31 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
             REQUIRE(oss.str() == "'t'");
         }
 
-        SECTION("char* (char[])")
+        SECTION("char*")
+        {
+            std::unique_ptr<char> s_up( new char[5] { 't', 'e', 's', 't', 0 });
+            oss << strings::literal(s_up.get());
+            REQUIRE(oss.str() == "\"test\"");
+        }
+
+        SECTION("char[]")
         {
             char s[5] { "test" };
             oss << strings::literal(s);
             REQUIRE(oss.str() == "\"test\"");
         }
 
-        SECTION("const char* (const char[])")
+        SECTION("const char*")
         {
-            oss << strings::literal("test");
+            const char* s { "test" };
+            oss << strings::literal(s);
+            REQUIRE(oss.str() == "\"test\"");
+        }
+
+        SECTION("const char[]")
+        {
+            const char s[5] { "test" };
+            oss << strings::literal(s);
             REQUIRE(oss.str() == "\"test\"");
         }
 
@@ -886,16 +901,31 @@ TEST_CASE("strings::quoted() printing/output streaming quoted strings",
             REQUIRE(oss.str() == "'t'");
         }
 
-        SECTION("char* (char[])")
+        SECTION("char*")
+        {
+            std::unique_ptr<char> s_up( new char[5] { 't', 'e', 's', 't', 0 });
+            oss << strings::quoted(s_up.get());
+            REQUIRE(oss.str() == "\"test\"");
+        }
+
+        SECTION("char[]")
         {
             char s[5] { "test" };
             oss << strings::quoted(s);
             REQUIRE(oss.str() == "\"test\"");
         }
 
-        SECTION("const char* (const char[])")
+        SECTION("const char*")
         {
-            oss << strings::quoted("test");
+            const char* s { "test" };
+            oss << strings::quoted(s);
+            REQUIRE(oss.str() == "\"test\"");
+        }
+
+        SECTION("const char[]")
+        {
+            const char s[5] { "test" };
+            oss << strings::quoted(s);
             REQUIRE(oss.str() == "\"test\"");
         }
 
