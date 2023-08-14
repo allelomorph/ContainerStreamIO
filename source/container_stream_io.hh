@@ -252,26 +252,6 @@ struct is_parseable_as_container<CharType[ArraySize],
                                                   void>> : public std::false_type
 {};
 
-// see note on default specialization above
-/**
- * @brief String specialization meant to ensure that we treat strings as nothing
- * more than strings.
- */
-template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
-struct is_parseable_as_container<
-    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>>
-    : public std::false_type
-{};
-
-// string_view should fail to meet default specialization
-// #if (__cplusplus >= 201703L)
-// template <typename CharacterType>
-// struct is_printable_as_container<
-//     std::basic_string_view<CharacterType>>
-//     : public std::false_type
-// {};
-// #endif
-
 #ifdef __cpp_variable_templates
 /**
  * @brief Helper variable template.
