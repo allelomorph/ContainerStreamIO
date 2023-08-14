@@ -129,18 +129,28 @@ struct is_string_type :
 {};
 
 template <typename Type, typename = void>
+struct has_emplace : public std::false_type
+{};
+
+// detection idiom: https://stackoverflow.com/a/41936999
+// detection idiom mod for variadics: https://stackoverflow.com/a/35669421
+// Tests for containers with emplace(const_iterator, args...), eg in
+//   std::vector, std::list, std::deque
+template <typename Type>
+struct has_emplace<
+    Type, std::void_t<decltype(std::declval<Type>().emplace(
+                                   std::declval<typename Type::const_iterator>()))>>
+    : public std::true_type
+{};
+
+template <typename Type, typename = void>
 struct has_iterless_emplace : public std::false_type
 {};
 
-// !!! This only tests for overloads that can take no args, eg emplace(args...)
-//   for std::(unordered_)(multi)set and std::(unordered_)(multi)map. Containers
-//   with emplace(const_iterator, args...), eg std::vector, std::list, and
-//   std::deque could, be tested for with
-//   `.emplace(declval<typename Type::const_iterator>())`, see:
-//   detection idiom: https://stackoverflow.com/a/41936999
-//   detection idiom mod for variadics: https://stackoverflow.com/a/35669421
+// Tests for emplace(args...) methods that don't require an interator, eg in
+//   std::(unordered_)(multi)set and std::(unordered_)(multi)map
 template <typename Type>
-struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type&>().emplace())>>
+struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type>().emplace())>>
     : public std::true_type
 {};
 
@@ -149,8 +159,26 @@ struct has_emplace_back : public std::false_type
 {};
 
 template <typename Type>
-struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type&>().emplace_back())>>
+struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type>().emplace_back())>>
     : public std::true_type
+{};
+
+template <typename Type, typename = void>
+struct has_emplace_after : public std::false_type
+{};
+
+template <typename Type>
+struct has_emplace_after<
+    Type, std::void_t<decltype(std::declval<Type>().emplace_after(
+                                   std::declval<typename Type::const_iterator>()))>>
+    : public std::true_type
+{};
+
+template <typename Type>
+struct supports_element_emplacement : public std::integral_constant<
+    bool,
+    has_emplace<Type>::value || has_iterless_emplace<Type>::value ||
+    has_emplace_back<Type>::value || has_emplace_after<Type>::value>
 {};
 
 /**
@@ -160,10 +188,9 @@ template <typename Type, typename = void>
 struct is_parseable_as_container : public std::false_type
 {};
 
-// !!! this generic omits basic_string_view (which misses clear()), as it should, but it
-//   includes basic_string, which necessitates basic_string overload below
-// !!! unlike the generic version of is_printable_as_container, this generic
-//   does not include std::array, which lacks clear()
+// basic_string and basic_string_view omitted due to not having emplace methods
+// unlike the generic version of is_printable_as_container, this generic
+//   does not include std::array, which lacks clear()/emplacement
 // TBD if we can commit to move-assigning a new container into the extraction target,
 //   clear() may not be totally necessary
 // std::vector, std::deque
@@ -177,10 +204,11 @@ struct is_parseable_as_container : public std::false_type
  */
 template <typename Type>
 struct is_parseable_as_container<
-    Type, std::void_t<
-              typename Type::value_type, decltype(std::declval<Type&>().clear())>>
-    : public std::integral_constant<
-    bool, std::is_move_constructible<typename Type::value_type>::value>
+    Type, std::void_t<typename Type::value_type,
+                      decltype(std::declval<Type>().clear())>>
+    : public std::integral_constant<bool,
+                                    supports_element_emplacement<Type>::value &&
+                                    std::is_move_constructible<typename Type::value_type>::value>
 {};
 
 /**
@@ -1388,6 +1416,7 @@ struct default_formatter
     //   should this overload and one for charT* be allowed? If so, support for
     //   charT[n] and char* should be moved into quoted()/literal(), to make for
     //   consistent formatting inside and outside supported containers.
+    // Needed for case of nested char arrays (eg char[][])
     template <typename CharType, std::size_t ArraySize>
     static auto parse_element(
         StreamType& istream, CharType (&element)[ArraySize]
@@ -1477,6 +1506,9 @@ template<typename ElementType, std::size_t ArraySize>
 static void safer_assign(ElementType (&source)[ArraySize],
                          ElementType (&target)[ArraySize])
 {
+    // TBD could be more idiomatic with:
+    // std::copy(std::begin(source), std::end(source), std::begin(target));
+    //   but that fails to take advantage of move for nestings like StlContT<>[]
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
          t_it != t_end; ++s_it, ++t_it)
@@ -1528,6 +1560,7 @@ static StreamType& array_from_stream(
     }
 
     formatter.parse_suffix(istream);  // fails if serialization too long
+    // TBD this can be changed to if (is.good()) as eofbit should not be set until consuming past last char in stream
     if (!istream.bad() && !istream.fail())
         safer_assign(temp_container, container);
     return istream;
