@@ -321,16 +321,14 @@ struct is_printable_as_container<CharType[ArraySize],
  * @brief String specialization meant to ensure that we treat strings as nothing
  * more than strings.
  */
-template <typename CharacterType, typename CharacterTraitsType, typename AllocatorType>
-struct is_printable_as_container<
-    std::basic_string<CharacterType, CharacterTraitsType, AllocatorType>>
+template <typename CharType, typename TraitsType, typename AllocType>
+struct is_printable_as_container<std::basic_string<CharType, TraitsType, AllocType>>
     : public std::false_type
 {};
 
 #if (__cplusplus >= 201703L)
 template <typename CharacterType>
-struct is_printable_as_container<
-    std::basic_string_view<CharacterType>>
+struct is_printable_as_container<std::basic_string_view<CharacterType>>
     : public std::false_type
 {};
 #endif
@@ -1435,46 +1433,10 @@ struct default_formatter
     }
 };
 
-// no need to test is_move_assignable here if is_parseable_as_container tests
-//   containers for is_move_constructible
-// std::vector, std::deque, std::list
-template<typename ContainerType, typename ElementType>
-static auto emplace_element(ContainerType& container, const ElementType& element
-    ) noexcept -> std::enable_if_t<
-        traits::has_emplace_back<ContainerType>::value,
-        void>
-{
-    container.emplace_back(element);
-}
-
-// need this overload due to const keys making set/map pairs non-move-assignable
-// std::(unordered_)set (redundant keys ignored)
-// std::(unordered_)map (redundant keys will have value of first appearance in serialization)
-// std::(unordered_)multiset, std::(unordered_)multimap
-template <typename ContainerType, typename KeyType, typename ValueType>
-static auto emplace_element(ContainerType& container,
-                            const std::pair<const KeyType, ValueType>& element
-    ) noexcept -> std::enable_if_t<
-        traits::has_iterless_emplace<ContainerType>::value,
-        void>
-{
-    container.emplace(element.first, element.second);
-}
-
-// !!? now this is the intended generic
-template <typename ContainerType, typename ElementType>
-static auto emplace_element(ContainerType& container, const ElementType& element
-    ) noexcept -> std::enable_if_t<
-        traits::has_iterless_emplace<ContainerType>::value &&
-        !traits::has_emplace_back<ContainerType>::value,
-        void>
-{
-    container.emplace(element);
-}
-
 // move-assignable (all STL containers (including std::array))
 template<typename ContainerType>
-static auto safer_assign(ContainerType& source, ContainerType& target
+static auto c_array_compatible_move_assignment(ContainerType& source,
+                                               ContainerType& target
     ) -> std::enable_if_t<
         std::is_move_assignable<ContainerType>::value,
         void>
@@ -1482,18 +1444,16 @@ static auto safer_assign(ContainerType& source, ContainerType& target
     target = std::move(source);
 }
 
+// TBD can this be improved with std::make_move_iterator?
 template<typename ElementType, std::size_t ArraySize>
-static void safer_assign(ElementType (&source)[ArraySize],
-                         ElementType (&target)[ArraySize])
+static void c_array_compatible_move_assignment(ElementType (&source)[ArraySize],
+                                               ElementType (&target)[ArraySize])
 {
-    // TBD could be more idiomatic with:
-    // std::copy(std::begin(source), std::end(source), std::begin(target));
-    //   but that fails to take advantage of move for nestings like StlContT<>[]
     auto t_end {std::end(target)};
     for (auto s_it {std::begin(source)}, t_it {std::begin(target)};
          t_it != t_end; ++s_it, ++t_it)
     {
-        safer_assign(*s_it, *t_it);
+        c_array_compatible_move_assignment(*s_it, *t_it);
     }
 }
 
@@ -1542,26 +1502,8 @@ static StreamType& array_from_stream(
     formatter.parse_suffix(istream);  // fails if serialization too long
     // TBD this can be changed to if (is.good()) as eofbit should not be set until consuming past last char in stream
     if (!istream.bad() && !istream.fail())
-        safer_assign(temp_container, container);
+        c_array_compatible_move_assignment(temp_container, container);
     return istream;
-}
-
-template <typename ElementType, std::size_t ArraySize,
-          typename StreamType, typename FormatterType>
-static StreamType& from_stream(
-    StreamType& istream, ElementType (&container)[ArraySize],
-    const FormatterType& formatter)
-{
-    return array_from_stream(istream, container, formatter);
-}
-
-template <typename ElementType, std::size_t ArraySize,
-          typename StreamType, typename FormatterType>
-static StreamType& from_stream(
-    StreamType& istream, std::array<ElementType, ArraySize>& container,
-    const FormatterType& formatter)
-{
-    return array_from_stream(istream, container, formatter);
 }
 
 /**
@@ -1612,6 +1554,61 @@ struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
     {}
 };
 
+// no need to test is_move_assignable here if is_parseable_as_container tests
+//   containers for is_move_constructible
+// std::vector, std::deque, std::list
+template<typename ContainerType, typename ElementType>
+static auto emplace_element(ContainerType& container, const ElementType& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_emplace_back<ContainerType>::value,
+        void>
+{
+    container.emplace_back(element);
+}
+
+// need this overload due to const keys making set/map pairs non-move-assignable
+// std::(unordered_)set (redundant keys ignored)
+// std::(unordered_)map (redundant keys will have value of first appearance in serialization)
+// std::(unordered_)multiset, std::(unordered_)multimap
+template <typename ContainerType, typename KeyType, typename ValueType>
+static auto emplace_element(ContainerType& container,
+                            const std::pair<const KeyType, ValueType>& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_iterless_emplace<ContainerType>::value,
+        void>
+{
+    container.emplace(element.first, element.second);
+}
+
+// !!? now this is the intended generic
+template <typename ContainerType, typename ElementType>
+static auto emplace_element(ContainerType& container, const ElementType& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_iterless_emplace<ContainerType>::value &&
+        !traits::has_emplace_back<ContainerType>::value,
+        void>
+{
+    container.emplace(element);
+}
+
+template <typename ElementType, std::size_t ArraySize,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, ElementType (&container)[ArraySize],
+    const FormatterType& formatter)
+{
+    return array_from_stream(istream, container, formatter);
+}
+
+template <typename ElementType, std::size_t ArraySize,
+          typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, std::array<ElementType, ArraySize>& container,
+    const FormatterType& formatter)
+{
+    return array_from_stream(istream, container, formatter);
+}
+
 /**
  * @brief Overload to deal with std::tuple<...> objects.
  */
@@ -1632,7 +1629,7 @@ static StreamType& from_stream(
     return istream;
 }
 
-// std::pairs, including set/map members
+// std::pairs, including map elements
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -1665,14 +1662,14 @@ static StreamType& from_stream(
     if (istream.bad() || istream.fail())
         return istream;
 
-    safer_assign(first, const_cast<BaseFirstType&>(container.first));
-    safer_assign(second, container.second);
+    c_array_compatible_move_assignment(first, const_cast<BaseFirstType&>(container.first));
+    c_array_compatible_move_assignment(second, container.second);
 
     return istream;
 }
 
-// std::forward_list requires unique overload due to only having emplace_after,
-//   and no easy way to get iterator to last element (end(), but no --it,)
+// std::forward_list requires unique overload due to only having emplace_(after|front),
+//   no easy way to get iterator to last element (end(), but no --it,)
 //   plus its iterators not being affeced by new emplacements
 template <typename StreamType, typename ElementType, typename FormatterType>
 static StreamType& from_stream(
