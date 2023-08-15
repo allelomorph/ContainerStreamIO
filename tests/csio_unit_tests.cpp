@@ -2367,3 +2367,75 @@ TEST_CASE("Printing with custom formatter",
         }
     }
 }
+
+TEST_CASE("Exploring edge cases for nested containers",
+          "[output][input]")
+{
+    SECTION("when istreaming into nestings c arrays and/or std::array:",
+            "(tests array_from_stream and relevant from_stream overloads)")
+    {
+        std::stringstream ss;
+
+        SECTION("std::vector<std::array<int[], N>>",
+                "(C arrays not supported as STL container elements)")
+        {
+            REQUIRE(!std::is_move_constructible<
+                    typename std::vector<std::array<int[2], 2>>::value_type::value_type
+                    >::value);
+        }
+
+        SECTION("std::vector<std::array<int, N>[]>",
+                "(C arrays not supported as STL container elements)")
+        {
+            REQUIRE(!std::is_move_constructible<
+                    typename std::vector<std::array<int, 2>[2]>::value_type
+                    >::value);
+        }
+
+        SECTION("std::array<std::vector<int>[], N>")
+        {
+            std::array<std::vector<int>[2], 2> acv {
+                { { { 1, 2 }, { 3, 4 } }, { { 5, 6 }, { 7, 8 } } }
+            };
+            ss << acv;
+            std::array<std::vector<int>[2], 2> _acv;
+            ss >> _acv;
+            REQUIRE(_acv[0][0] == acv[0][0]);
+            REQUIRE(_acv[0][1] == acv[0][1]);
+            REQUIRE(_acv[1][0] == acv[1][0]);
+            REQUIRE(_acv[1][1] == acv[1][1]);
+        }
+
+        SECTION("std::array<std::vector<int[]>>, N>",
+                "(C arrays not supported as STL container elements)")
+        {
+            REQUIRE(!std::is_move_constructible<
+                    typename std::array<std::vector<int[2]>, 2>::value_type::value_type
+                    >::value);
+        }
+
+        SECTION("std::array<std::vector<int>, N>[]")
+        {
+            std::array<std::vector<int>, 2> av1 { { { 1, 2 }, { 3, 4 } } };
+            std::array<std::vector<int>, 2> av2 { { { 5, 6 }, { 7, 8 } } };
+            std::array<std::vector<int>, 2> cav[2] { av1, av2 };
+            ss << cav;
+            std::array<std::vector<int>, 2> _cav[2];
+            ss >> _cav;
+            REQUIRE(_cav[0] == cav[0]);
+            REQUIRE(_cav[1] == cav[1]);
+        }
+
+        SECTION("std::vector<std::array<int, N>>[]")
+        {
+            std::vector<std::array<int, 2>> va1 { { 1, 2 }, { 3, 4 } };
+            std::vector<std::array<int, 2>> va2 { { 5, 6 }, { 7, 8 } };
+            std::vector<std::array<int, 2>> cva[2] { va1, va2 };
+            ss << cva;
+            std::vector<std::array<int, 2>> _cva[2];
+            ss >> _cva;
+            REQUIRE(_cva[0] == cva[0]);
+            REQUIRE(_cva[1] == cva[1]);
+        }
+    }
+}
