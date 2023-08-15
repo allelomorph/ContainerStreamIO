@@ -110,6 +110,96 @@ struct custom_formatter
 
 using namespace container_stream_io;
 
+TEST_CASE("Traits: detect non-char types",
+          "[traits][strings]")
+{
+    REQUIRE(traits::is_char_type<int>::value == false);
+    REQUIRE(traits::is_char_type<std::vector<int>>::value == false);
+}
+
+TEST_CASE("Traits: detect char types",
+          "[traits][strings]")
+{
+    REQUIRE(traits::is_char_type<char>::value == true);
+    REQUIRE(traits::is_char_type<wchar_t>::value == true);
+#if __cplusplus > 201703L
+    REQUIRE(traits::is_char_type<char8_t>::value == true);
+#endif
+    REQUIRE(traits::is_char_type<char16_t>::value == true);
+    REQUIRE(traits::is_char_type<char32_t>::value == true);
+}
+
+TEST_CASE("Traits: detect non-string types",
+          "[traits][strings]")
+{
+    REQUIRE(traits::is_string_type<int>::value == false);
+    REQUIRE(traits::is_string_type<int*>::value == false);
+    REQUIRE(traits::is_string_type<int[5]>::value == false);
+    REQUIRE(traits::is_string_type<std::vector<int>>::value == false);
+}
+
+TEST_CASE("Traits: detect string types",
+          "[traits][strings]")
+{
+    SECTION("C strings",
+            "(when passsing by const &, constness may be applied to pointer "
+            "rather than char, so we include const varieties)")
+    {
+        REQUIRE(traits::is_c_string_type<char*>::value == true);
+        REQUIRE(traits::is_c_string_type<const char*>::value == true);
+        REQUIRE(traits::is_c_string_type<char[5]>::value == true);
+        REQUIRE(traits::is_c_string_type<const char[5]>::value == true);
+
+        REQUIRE(traits::is_string_type<char*>::value == true);
+        REQUIRE(traits::is_string_type<const char*>::value == true);
+        REQUIRE(traits::is_string_type<char[5]>::value == true);
+        REQUIRE(traits::is_string_type<const char[5]>::value == true);
+    }
+
+    SECTION("STL strings",
+            "(intended for resolutions when passing by const &, so no need to "
+            "include const varieties)")
+    {
+        REQUIRE(traits::is_stl_string_type<std::basic_string<char>>::value == true);
+        REQUIRE(traits::is_stl_string_type<const std::basic_string<char>>::value == false);
+#if __cplusplus >= 201703L
+        REQUIRE(traits::is_stl_string_type<std::basic_string_view<char>>::value == true);
+        REQUIRE(traits::is_stl_string_type<const std::basic_string_view<char>>::value == false);
+#endif
+
+        REQUIRE(traits::is_string_type<std::basic_string<char>>::value == true);
+        REQUIRE(traits::is_string_type<const std::basic_string<char>>::value == false);
+#if __cplusplus >= 201703L
+        REQUIRE(traits::is_string_type<std::basic_string_view<char>>::value == true);
+        REQUIRE(traits::is_string_type<const std::basic_string_view<char>>::value == false);
+#endif
+    }
+}
+
+TEST_CASE("Traits: detect emplace methods",
+          "[traits]")
+{
+    REQUIRE(traits::has_iterless_emplace<std::vector<int>>::value == false);
+    REQUIRE(traits::has_emplace<std::vector<int>>::value          == true);
+    REQUIRE(traits::has_emplace_back<std::vector<int>>::value     == true);
+    REQUIRE(traits::has_emplace_after<std::vector<int>>::value    == false);
+
+    REQUIRE(traits::has_iterless_emplace<std::set<int>>::value == true);
+    REQUIRE(traits::has_emplace<std::set<int>>::value          == false);
+    REQUIRE(traits::has_emplace_back<std::set<int>>::value     == false);
+    REQUIRE(traits::has_emplace_after<std::set<int>>::value    == false);
+
+    REQUIRE(traits::has_iterless_emplace<std::forward_list<int>>::value == false);
+    REQUIRE(traits::has_emplace<std::forward_list<int>>::value          == false);
+    REQUIRE(traits::has_emplace_back<std::forward_list<int>>::value     == false);
+    REQUIRE(traits::has_emplace_after<std::forward_list<int>>::value    == true);
+
+    REQUIRE(traits::has_iterless_emplace<int>::value == false);
+    REQUIRE(traits::has_emplace<int>::value          == false);
+    REQUIRE(traits::has_emplace_back<int>::value     == false);
+    REQUIRE(traits::has_emplace_after<int>::value    == false);
+}
+
 TEST_CASE("Traits: detect as parseable (input stream extractable)",
           "[traits][input]")
 {
@@ -301,85 +391,6 @@ TEST_CASE("Traits: detect as not printable (output stream insertable)",
     {
         REQUIRE(traits::is_printable_as_container<stack_wrapper<int>>::value == false);
     }
-}
-
-TEST_CASE("Traits: detect non-char types",
-          "[traits][strings]")
-{
-    REQUIRE(traits::is_char_type<int>::value == false);
-    REQUIRE(traits::is_char_type<std::vector<int>>::value == false);
-}
-
-TEST_CASE("Traits: detect char types",
-          "[traits][strings]")
-{
-    REQUIRE(traits::is_char_type<char>::value == true);
-    REQUIRE(traits::is_char_type<wchar_t>::value == true);
-#if __cplusplus > 201703L
-    REQUIRE(traits::is_char_type<char8_t>::value == true);
-#endif
-    REQUIRE(traits::is_char_type<char16_t>::value == true);
-    REQUIRE(traits::is_char_type<char32_t>::value == true);
-}
-
-TEST_CASE("Traits: detect non-string types",
-          "[traits][strings]")
-{
-    REQUIRE(traits::is_string_type<int>::value == false);
-    REQUIRE(traits::is_string_type<int*>::value == false);
-    REQUIRE(traits::is_string_type<int[5]>::value == false);
-    REQUIRE(traits::is_string_type<std::vector<int>>::value == false);
-}
-
-TEST_CASE("Traits: detect string types",
-          "[traits][strings]")
-{
-    SECTION("C strings",
-            "(when passsing by const &, constness may be applied to pointer "
-            "rather than char, so we include const varieties)")
-    {
-        REQUIRE(traits::is_c_string_type<char*>::value == true);
-        REQUIRE(traits::is_c_string_type<const char*>::value == true);
-        REQUIRE(traits::is_c_string_type<char[5]>::value == true);
-        REQUIRE(traits::is_c_string_type<const char[5]>::value == true);
-
-        REQUIRE(traits::is_string_type<char*>::value == true);
-        REQUIRE(traits::is_string_type<const char*>::value == true);
-        REQUIRE(traits::is_string_type<char[5]>::value == true);
-        REQUIRE(traits::is_string_type<const char[5]>::value == true);
-    }
-
-    SECTION("STL strings",
-            "(intended for resolutions when passing by const &, so no need to "
-            "include const varieties)")
-    {
-        REQUIRE(traits::is_stl_string_type<std::basic_string<char>>::value == true);
-        REQUIRE(traits::is_stl_string_type<const std::basic_string<char>>::value == false);
-#if __cplusplus >= 201703L
-        REQUIRE(traits::is_stl_string_type<std::basic_string_view<char>>::value == true);
-        REQUIRE(traits::is_stl_string_type<const std::basic_string_view<char>>::value == false);
-#endif
-
-        REQUIRE(traits::is_string_type<std::basic_string<char>>::value == true);
-        REQUIRE(traits::is_string_type<const std::basic_string<char>>::value == false);
-#if __cplusplus >= 201703L
-        REQUIRE(traits::is_string_type<std::basic_string_view<char>>::value == true);
-        REQUIRE(traits::is_string_type<const std::basic_string_view<char>>::value == false);
-#endif
-    }
-}
-
-TEST_CASE("Traits: detect emplace methods",
-          "[traits]")
-{
-    REQUIRE(traits::has_iterless_emplace<std::vector<int>>::value == false);
-    REQUIRE(traits::has_emplace_back<std::vector<int>>::value == true);
-
-    REQUIRE(traits::has_iterless_emplace<std::set<int>>::value == true);
-    REQUIRE(traits::has_emplace_back<std::set<int>>::value == false);
-
-    REQUIRE(traits::has_iterless_emplace<int>::value == false);
-    REQUIRE(traits::has_emplace_back<int>::value == false);
 }
 
 TEST_CASE("strings::literal() printing/output streaming escaped literals",
