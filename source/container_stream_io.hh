@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstdint>    // (u)int_XX_t
-#include <algorithm>  // copy find_if for_each (limits:numeric_limits)
-// #include <cstddef>    // size_t
+#include <cstdint>      // (u)int_XX_t
+#include <algorithm>    // copy find_if for_each (limits:numeric_limits)
+#include <cstddef>      // size_t
 #include <iostream>
 #include <set>
 #include <map>
@@ -10,11 +10,9 @@
 #include <tuple>
 #include <forward_list>
 #include <utility>
-
-#include <iomanip>   // setfill, setw
-// #include <iterator>  // begin, end
-// #include <type_traits>  // true_type, false_type
-#include "TypeName.hh" // testing
+#include <iomanip>      // setfill, setw
+#include <iterator>     // begin, end
+#include <type_traits>  // true_type, false_type
 
 #if (__cplusplus < 201103L)
 #error "container_stream_io only supports C++11 and above"
@@ -24,43 +22,44 @@ namespace std {
 
 #if (__cplusplus < 201402L)
 
-// No feature test macro found for decay_t.
-template<class T>
+// no feature test macro found for decay_t
+template <class T>
 using decay_t = typename decay<T>::type;
 
-// No feature test macro found for enable_if_t.
-template< bool B, class T = void >
+// no feature test macro found for enable_if_t
+template <bool B, class T = void>
 using enable_if_t = typename enable_if<B,T>::type;
 
-// No feature test macro found for remove_const_t.
-template< class T >
+// no feature test macro found for remove_const_t
+template <class T>
 using remove_const_t = typename remove_const<T>::type;
 
-// Use of variable template is_(parse/print)able_as_container_v below ellided by
-//   testing for feature test macro __cpp_variable_templates.
-
-// Use of generic lambda in to_stream(not tuple or pair) below ellided by
-//   testing for feature test macro __cpp_generic_lambdas.
+// Use of generic lambda in generic overload of to_stream ellided by
+//   testing for feature test macro __cpp_generic_lambdas
 
 #endif  // pre-C++14
 
-#if (__cplusplus < 201703L)
+#ifndef __cpp_lib_void_t  // from C++17
 
-#  ifndef __cpp_lib_void_t
-#define __cpp_lib_void_t 201411L
-template<typename...>
+template <typename...>
 using void_t = void;
-#  endif  // undefined __cpp_lib_void_t
 
-#endif  // pre-C++17
+#endif  // void_t not implemented
 
 }  // namespace std
 
 
 namespace container_stream_io {
 
+/*
+ * @brief contains templates to use in resolution of other template functions
+ *   and classes
+ */
 namespace traits {
 
+/*
+ * @brief tests for character types
+ */
 template <typename Type>
 struct is_char_type : public std::false_type
 {};
@@ -87,6 +86,9 @@ template <>
 struct is_char_type<char32_t> : public std::true_type
 {};
 
+/*
+ * @brief tests for (const) character type pointers or C arrays
+ */
 template <typename Type>
 struct is_c_string_type : public std::false_type
 {};
@@ -103,6 +105,9 @@ struct is_c_string_type<CharType[ArraySize]> :
                                   is_char_type<std::remove_const_t<CharType>>::value>
 {};
 
+/*
+ * @brief tests for STL string types
+ */
 template <typename Type>
 struct is_stl_string_type : public std::false_type
 {};
@@ -121,6 +126,9 @@ struct is_stl_string_type<std::basic_string_view<CharType>> :
 
 #endif  // C++17 and above
 
+/*
+ * @brief tests for character type pointers and C arrays, plus STL string types
+ */
 template <typename StringType>
 struct is_string_type :
     public std::integral_constant<bool,
@@ -128,32 +136,41 @@ struct is_string_type :
                                   is_stl_string_type<StringType>::value>
 {};
 
+/*
+ * @brief tests for member function emplace(const_iterator, args...), eg as
+ *   found in std::vector, std::list, std::deque
+ * @notes
+ *   - detection idiom:                   https://stackoverflow.com/a/41936999
+ *   - detection idiom mod for variadics: https://stackoverflow.com/a/35669421
+ */
 template <typename Type, typename = void>
 struct has_emplace : public std::false_type
 {};
 
-// detection idiom: https://stackoverflow.com/a/41936999
-// detection idiom mod for variadics: https://stackoverflow.com/a/35669421
-// Tests for containers with emplace(const_iterator, args...), eg in
-//   std::vector, std::list, std::deque
 template <typename Type>
 struct has_emplace<
-    Type, std::void_t<decltype(std::declval<Type>().emplace(
-                                   std::declval<typename Type::const_iterator>()))>>
+    Type, std::void_t<decltype(
+    std::declval<Type>().emplace(std::declval<typename Type::const_iterator>()))>>
     : public std::true_type
 {};
 
+/*
+ * @brief tests for member function emplace(args...) (no iterator required), eg
+ *   as found in std::(unordered_)(multi)set, std::(unordered_)(multi)map
+ */
 template <typename Type, typename = void>
 struct has_iterless_emplace : public std::false_type
 {};
 
-// Tests for emplace(args...) methods that don't require an interator, eg in
-//   std::(unordered_)(multi)set and std::(unordered_)(multi)map
 template <typename Type>
 struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type>().emplace())>>
     : public std::true_type
 {};
 
+/*
+ * @brief tests for member function emplace_back(args...) (no iterator required),
+ *   eg as found in std::vector, std::list, std::deque
+ */
 template <typename Type, typename = void>
 struct has_emplace_back : public std::false_type
 {};
@@ -163,17 +180,25 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type>().emplace_
     : public std::true_type
 {};
 
+/*
+ * @brief tests for member function emplace_after(const iterator, args...),
+ *   eg as found in std::forward_list
+ */
 template <typename Type, typename = void>
 struct has_emplace_after : public std::false_type
 {};
 
 template <typename Type>
 struct has_emplace_after<
-    Type, std::void_t<decltype(std::declval<Type>().emplace_after(
-                                   std::declval<typename Type::const_iterator>()))>>
+    Type, std::void_t<decltype(
+    std::declval<Type>().emplace_after(std::declval<typename Type::const_iterator>()))>>
     : public std::true_type
 {};
 
+/*
+ * @brief tests for presence of some emplacement member function that can be
+ *   used during container extraction from istreams
+ */
 template <typename Type>
 struct supports_element_emplacement : public std::integral_constant<
     bool,
@@ -181,27 +206,29 @@ struct supports_element_emplacement : public std::integral_constant<
     has_emplace_back<Type>::value || has_emplace_after<Type>::value>
 {};
 
-/**
- * @brief Base case for the testing of STL compatible container types.
+/*
+ * @brief tests for class compatibility with container istreaming
+ * @notes overloads should behave as follows:
+ *   - base case: all incompatible types excluded
+ *   - default: intended for inclusion of most STL container types, includes
+ *       classes with members value_type (which is a move-constructible type,)
+ *       clear(), and a supported version of emplacement:
+ *         std::vector, std::deque, std::forward_list, std::list,
+ *         std::(unordered_)(multi)set, std::(unordered_)(multi)map
+ *       but not:
+ *         std::stack, std::queue, std::priority_queue (lacking clear())
+ *         std::basic_string, std::basic_string_view (lacking emplacement)
+ *         std::array (lacking both clear() and emplacement)
+ *   - std::pair: exeception to default
+ *   - std::tuple: exeception to default
+ *   - std::array: exeception to default
+ *   - C array of non-char type: exeception to default
+ *   - C array of char type: explicitly excluded to differentiate from non-char arrays
  */
 template <typename Type, typename = void>
 struct is_parseable_as_container : public std::false_type
 {};
 
-// basic_string and basic_string_view omitted due to not having emplace methods
-// unlike the generic version of is_printable_as_container, this generic
-//   does not include std::array, which lacks clear()/emplacement
-// TBD if we can commit to move-assigning a new container into the extraction target,
-//   clear() may not be totally necessary
-// std::vector, std::deque
-// std::forward_list, std::list
-// std::(unordered_)(multi)set, std::(unordered_)(multi)map
-// not std::stack, std::queue, std::priority_queue (have value_type, but not clear())
-/**
- * @brief Specialization to ensure that Standard Library compatible containers that are
- * move constructible and have members `value_type` and `clear()` are treated as
- * parseable containers.
- */
 template <typename Type>
 struct is_parseable_as_container<
     Type, std::void_t<typename Type::value_type,
@@ -211,68 +238,60 @@ struct is_parseable_as_container<
                                     std::is_move_constructible<typename Type::value_type>::value>
 {};
 
-/**
- * @brief Specialization to treat std::pair<...> as a parseable container type.
- */
 template <typename FirstType, typename SecondType>
 struct is_parseable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat std::tuple<...> as a parseable container type.
- */
 template <typename... Args>
 struct is_parseable_as_container<std::tuple<Args...>> : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat STL arrays as parseable container types.
- */
 template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<std::array<ArrayType, ArraySize>> : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat non-character C arrays as parseable container types.
- */
 template <typename ArrayType, std::size_t ArraySize>
 struct is_parseable_as_container<ArrayType[ArraySize],
-                                 std::enable_if_t<!is_char_type<ArrayType>::value,
-                                                  void>> : public std::true_type
+                                 std::enable_if_t<!is_char_type<ArrayType>::value, void>>
+    : public std::true_type
 {};
 
-/**
- * @brief Character C array specialization meant to ensure that we print
- * character arrays as strings and not as delimiter containers of individual
- * characters.
- */
 template <typename CharType, std::size_t ArraySize>
 struct is_parseable_as_container<CharType[ArraySize],
-                                 std::enable_if_t<is_char_type<CharType>::value,
-                                                  void>> : public std::false_type
+                                 std::enable_if_t<is_char_type<CharType>::value, void>>
+    : public std::false_type
 {};
 
-#ifdef __cpp_variable_templates
+#ifdef __cpp_variable_templates  // C++14 and above
 /**
- * @brief Helper variable template.
+ * @brief variable template for is_parseable_as_container
  */
 template <typename Type>
 constexpr bool is_parseable_as_container_v = is_parseable_as_container<Type>::value;
 
 #endif
-/**
- * @brief Base case for the testing of STL compatible container types.
+/*
+ * @brief tests for class compatibility with container ostreaming
+ * @notes overloads should behave as follows:
+ *   - base case: all incompatible types excluded
+ *   - default: intended for inclusion of most STL container types, includes
+ *       classes that are "iterable," with members iterator, begin(), end(),
+ *       and empty():
+ *         std::array, std::vector, std::deque, std::forward_list, std::list,
+ *         std::(unordered_)(multi)set, std::(unordered_)(multi)map
+ *       but not:
+ *         std::stack, std::queue, std::priority_queue (lacking iterator, begin(), end())
+ *   - std::pair: exeception to default
+ *   - std::tuple: exeception to default
+ *   - C array of non-char type: exeception to default
+ *   - C array of char type: explicitly excluded to differentiate from non-char arrays
+ *   - std::basic_string: exclusion from default
+ *   - std::basic_string_view: exclusion from default
  */
 template <typename Type, typename = void>
 struct is_printable_as_container : public std::false_type
 {};
 
-// generic
-/**
- * @brief Specialization to ensure that Standard Library compatible containers
- * that have begin(), end(), and empty() member functions are treated as
- * printable containers.
- */
 template <typename Type>
 struct is_printable_as_container<
     Type, std::void_t<typename Type::iterator,
@@ -282,67 +301,48 @@ struct is_printable_as_container<
     : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat std::pair<...> as a printable container type.
- */
 template <typename FirstType, typename SecondType>
 struct is_printable_as_container<std::pair<FirstType, SecondType>> : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat std::tuple<...> as a printable container type.
- */
 template <typename... Args>
 struct is_printable_as_container<std::tuple<Args...>> : public std::true_type
 {};
 
-/**
- * @brief Specialization to treat non-character C arrays as printable container types.
- */
 template <typename ArrayType, std::size_t ArraySize>
 struct is_printable_as_container<ArrayType[ArraySize],
-                                 std::enable_if_t<!is_char_type<ArrayType>::value,
-                                                  void>> : public std::true_type
+                                 std::enable_if_t<!is_char_type<ArrayType>::value, void>>
+    : public std::true_type
 {};
 
-/**
- * @brief Character C array specialization meant to ensure that we print
- * character arrays as strings and not as delimiter containers of individual
- * characters.
- */
-template <typename CharType, std::size_t ArraySize>
-struct is_printable_as_container<CharType[ArraySize],
-                                 std::enable_if_t<is_char_type<CharType>::value,
-                                                  void>> : public std::false_type
+template <typename ArrayType, std::size_t ArraySize>
+struct is_printable_as_container<ArrayType[ArraySize],
+                                 std::enable_if_t<is_char_type<ArrayType>::value, void>>
+    : public std::false_type
 {};
 
-// exclude strings from generic
-/**
- * @brief String specialization meant to ensure that we treat strings as nothing
- * more than strings.
- */
 template <typename CharType, typename TraitsType, typename AllocType>
 struct is_printable_as_container<std::basic_string<CharType, TraitsType, AllocType>>
     : public std::false_type
 {};
 
 #if (__cplusplus >= 201703L)
-template <typename CharacterType>
-struct is_printable_as_container<std::basic_string_view<CharacterType>>
+template <typename CharType>
+struct is_printable_as_container<std::basic_string_view<CharType>>
     : public std::false_type
 {};
 #endif
 
-#ifdef __cpp_variable_templates
+#ifdef __cpp_variable_templates  // C++14 and above
 /**
- * @brief Helper variable template.
+ * @brief variable template for is_printable_as_container
  */
 template <typename Type>
 constexpr bool is_printable_as_container_v = is_printable_as_container<Type>::value;
 
 #endif
 /**
- * @brief Helper function to determine if a container is empty.
+ * @brief helper function to determine if a container is empty
  */
 template <typename ContainerType>
 bool is_empty(const ContainerType& container) noexcept
@@ -351,7 +351,7 @@ bool is_empty(const ContainerType& container) noexcept
 }
 
 /**
- * @brief Helper function to test arrays for emptiness.
+ * @brief helper function to test C arrays for emptiness
  */
 template <typename ArrayType, std::size_t ArraySize>
 constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
@@ -361,17 +361,24 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 
 } // namespace traits
 
+/*
+ * @brief contains resources for string encoding/decoding
+ */
 namespace strings {
 
+/*
+ * @brief contains implementation of macros which generate compile-time string
+ *   or character literals templated by character type
+ * @notes adapted from: https://stackoverflow.com/a/60770220
+ */
 namespace compile_time {
-
-// functions to convert ascii string literals in source to appropriate char type,
-//   adapted from:
-//   - https://stackoverflow.com/a/60770220
 
 #if (__cplusplus >= 201703L)
 
-template<typename CharType>
+/*
+ * @brief C++17 implementation of CHAR_LITERAL
+ */
+template <typename CharType>
 constexpr const CharType char_literal(
     [[maybe_unused]] const char ac,
     [[maybe_unused]] const wchar_t wc,
@@ -390,8 +397,11 @@ constexpr const CharType char_literal(
     else if constexpr( std::is_same_v<CharType, char32_t> )  return u32c;
 }
 
-template<typename CharType,
-         std::size_t SizeAscii, std::size_t SizeWide,
+/*
+ * @brief C++17 implementation of STRING_LITERAL
+ */
+template <typename CharType,
+          std::size_t SizeAscii, std::size_t SizeWide,
 #if (__cplusplus > 201703L)
          std::size_t SizeUTF8,
 #endif
@@ -425,8 +435,11 @@ constexpr auto string_literal(
 
 #else // __cplusplus < 201703L
 
-// constepxr functions implicitly inline per C++11 standard: https://stackoverflow.com/a/14391320
-// full template specialization appropriate
+/*
+ * @brief C++11 implementation of CHAR_LITERAL
+ * @notes constepxr functions implicitly inline per C++11 standard:
+ *   https://stackoverflow.com/a/14391320
+ */
 template<typename CharType>
 constexpr CharType char_literal(
     const char ac, const wchar_t wc, const char16_t u16c, const char32_t u32c);
@@ -459,10 +472,12 @@ constexpr char32_t char_literal(
     return u32c;
 }
 
-// partial function template specialization not allowed by standard, see:
-//   - https://stackoverflow.com/a/21218271
-//   so instead using overloads each templated by literal sizes and enabled by
-//   return char type,
+/*
+ * @brief C++11 implementation of STRING_LITERAL
+ * @notes partial function template specialization not allowed by standard, see:
+ *   https://stackoverflow.com/a/21218271, so instead using overloads each
+ *   templated by literal sizes and enabled by return char type
+ */
 template<typename CharType,
          std::size_t SizeAscii, std::size_t SizeWide,
          std::size_t SizeUTF16, std::size_t SizeUTF32>
@@ -519,74 +534,71 @@ constexpr auto string_literal(
 
 #if (__cplusplus > 201703L)
 
-#define  CHAR_LITERAL(CHAR_T, LITERAL) \
+#  define CHAR_LITERAL(CHAR_T, LITERAL) \
     char_literal<CHAR_T>( LITERAL, L ## LITERAL, u8 ## LITERAL, \
                           u ## LITERAL, U ## LITERAL )
 
-#define  STRING_LITERAL(CHAR_T, LITERAL) \
+#  define STRING_LITERAL(CHAR_T, LITERAL) \
     string_literal<CHAR_T>( LITERAL, L ## LITERAL, u8 ## LITERAL, \
                             u ## LITERAL, U ## LITERAL )
 
 #else  // __cplusplus <= 201703L
 
-#define  CHAR_LITERAL(CHAR_T, LITERAL) \
+#  define CHAR_LITERAL(CHAR_T, LITERAL) \
     char_literal<CHAR_T>( LITERAL, L ## LITERAL, u ## LITERAL, U ## LITERAL )
 
-#define  STRING_LITERAL(CHAR_T, LITERAL) \
+#  define STRING_LITERAL(CHAR_T, LITERAL) \
     string_literal<CHAR_T>( LITERAL, L ## LITERAL, u ## LITERAL, U ## LITERAL )
 
 #endif
 
 } // namespace compile_time
 
-// quoted/literal implementation (string_repr, operator<</>>(string_repr),
-//   quoted(), literal()) based on glibc C++14 std::quoted (as seen in iomanip
-//   and bits/quoted_string.h headers;) redone here to add features and allow
-//   use in C++11
-
+/*
+ * @brief implementation details for quoted/literal
+ * @notes quoted/literal implementation (string_repr, operator<</>>(string_repr),
+ *   quoted(), literal()) is based on GNU ISO C++14 std::quoted (as seen in
+ *   headers `iomanip`, `bits/quoted_string.h`) and reworked here to add features
+ *   and allow use in C++11
+ */
 namespace detail {
 
-// quoted encoding:
-// - only delim/escape escaped
-// - can choose any, even non-ascii, delim/escape
-// - only enabled if sizeof(StreamCharType) >= sizeof(StringCharType), as
-//     non-delim/escape chars passed directly
-
-// literal encoding:
-// - limited to printable ascii via:
-//   - only printable ascii delim/escape
-//   - delim/escape escaped
-//   - standard unprintable ascii escape seqs
-//   - other unprintable ascii hex escaped
-//   - values beyond 7-bit range (0x7f) escaped
-// - enabled for any combo of string and stream char type
-
-// quoted decoding:
-// - only enabled if sizeof(StreamCharType) <= sizeof(StringCharType), as
-//     non-delim/escape chars passed directly
-
-// literal decoding:
-// - enabled for any combo of string and stream char type, but failbit will be
-//     set by hex widths beyond sizeof(StringCharType)
-
-// labels for flag values used to set string representation type
+/*
+ * @brief labels for string representation type flag values
+ */
 enum class repr_type { literal, quoted };
 
-// stream index getter for use with iword/pword to set literalrepr/quotedrepr
+/*
+ * @brief stream index getter for use with iword/pword to set literalrepr/quotedrepr
+ */
 static inline int get_manip_i()
 {
     static int i {std::ios_base::xalloc()};
     return i;
 }
 
-template<typename StringType, typename CharType>
+/*
+ * @brief string representation, contains data necessary to istream/ostream a
+ *   a quoted/literal string encoding
+ */
+template <typename StringType, typename CharType>
 struct string_repr
 {
 private:
-    // given char and wchar_t share the same set of standard escapes, and
-    //   Unicode code points below 0x7f map to 7-bit ASCII, escapes treated the
-    //   same for all char types
-    // wrapping in struct to avoid variable template use for C++11 compliance
+    /*
+     * @brief contains standard ascii escape sequences, mapped both by value and
+     *   by escape symbol
+     * @notes
+     *   - by_value and by_symbol need to be wrapped in a struct to avoid
+     *       variable template use (for C++11 compliance)
+     *   - given Unicode code points below 0x7f map to 7-bit ASCII, escapes
+     *       treated the same for all char types
+     *   - legacy C trigraphs and "\?" -> '?' escaping ignored for now, see:
+     *       https://en.cppreference.com/w/cpp/language/escape
+     *       https://en.cppreference.com/w/c/language/operator_alternative
+     *   - non-literal (std::map has non-trivial dtor) static members must be
+     *       initialized outside class definition (per gcc)
+     */
     struct ascii_escapes
     {
         static std::map<CharType, CharType> by_value;
@@ -623,22 +635,18 @@ public:
 
 #if (__cplusplus < 201703L)
 
-// linker needs declaration of static constexpr members outside class for
-//   standards below C++17, see:
-//   - https://en.cppreference.com/w/cpp/language/static
-//   - https://stackoverflow.com/a/28846608
-template<typename StringType, typename CharType>
+/*
+ * linker needs declaration of static constexpr members outside class for
+ *   standards below C++17, see:
+ *   - https://en.cppreference.com/w/cpp/language/static
+ *   - https://stackoverflow.com/a/28846608
+ */
+template <typename StringType, typename CharType>
 constexpr typename string_repr<StringType, CharType>::ascii_escapes string_repr<StringType, CharType>::escapes;
 
 #endif  // pre-C++17
 
-// non-literal (std::map has non-trivial dtor) static members must be
-//   initialized outside class definition (per gcc)
-// \', \", and \\ handled by choosing custom delim/escape chars
-// legacy C trigraphs and "\?" -> '?' escaping ignored for now, see:
-//   - https://en.cppreference.com/w/cpp/language/escape
-//   - https://en.cppreference.com/w/c/language/operator_alternative
-template<typename StringType, typename CharType>
+template <typename StringType, typename CharType>
 std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::by_value
 {
     {
@@ -647,7 +655,7 @@ std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::b
     }
 };
 
-template<typename StringType, typename CharType>
+template <typename StringType, typename CharType>
 std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::by_symbol
 {
     {
@@ -656,9 +664,10 @@ std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::b
     }
 };
 
-// insert_literal_prefix and insert_escaped_char help to shorten
-//   operator<<(string_repr) overload definitions
-template<typename StreamCharType, typename StringCharType>
+/*
+ * @brief helper to operator<<(string_repr), ostreams literal prefix
+ */
+template <typename StreamCharType, typename StringCharType>
 static void insert_literal_prefix(
         std::basic_ostream<StreamCharType>& os)
 {
@@ -675,7 +684,11 @@ static void insert_literal_prefix(
         os << CHAR_LITERAL(StreamCharType, 'U');
 }
 
-template<typename StreamCharType, typename StringType, typename StringCharType>
+/*
+ * @brief helper to operator<<(string_repr), ostreams one character from a
+ *   string representation
+ */
+template <typename StreamCharType, typename StringType, typename StringCharType>
 static void insert_escaped_char(
     std::basic_ostream<StreamCharType>& os,
     const string_repr<StringType, StringCharType>& repr,
@@ -709,70 +722,14 @@ static void insert_escaped_char(
 }
 
 // TBD maybe throw exeception rather than set failbit on quoted char size failure?
-template<typename StreamCharType, typename CharType, typename StringCharType>
-auto operator<<(
-    std::basic_ostream<StreamCharType>& ostream,
-    const string_repr<CharType&, StringCharType>& repr
-    ) -> std::enable_if_t<
-    std::is_same<StringCharType, std::remove_const_t<CharType>>::value,
-    std::basic_ostream<StreamCharType>&>
-{
-    if (repr.type == repr_type::quoted &&
-        sizeof(StreamCharType) < sizeof(StringCharType))
-    {
-        ostream.setstate(std::ios_base::failbit);
-        return ostream;
-    }
-    std::basic_ostringstream<StreamCharType> oss;
-    insert_literal_prefix<StreamCharType, StringCharType>(oss);
-    oss << StreamCharType(repr.delim);
-    if (repr.type == repr_type::quoted)
-    {
-        if (repr.string == repr.delim || repr.string == repr.escape)
-            oss << StreamCharType(repr.escape);
-        oss << StreamCharType(repr.string);
-    }
-    else
-        insert_escaped_char(oss, repr, repr.string);
-    oss << StreamCharType(repr.delim);
-    return ostream << oss.str();
-}
-
-template<typename StreamCharType, typename CharType, typename StringCharType>
-auto operator<<(
-    std::basic_ostream<StreamCharType>& ostream,
-    const string_repr<CharType*, StringCharType>& repr
-    ) -> std::enable_if_t<
-    std::is_same<StringCharType, std::remove_const_t<CharType>>::value,
-    std::basic_ostream<StreamCharType>&>
-{
-    if (repr.type == repr_type::quoted &&
-        sizeof(StreamCharType) < sizeof(StringCharType))
-    {
-        ostream.setstate(std::ios_base::failbit);
-        return ostream;
-    }
-    std::basic_ostringstream<StreamCharType> oss;
-    insert_literal_prefix<StreamCharType, StringCharType>(oss);
-    oss << StreamCharType(repr.delim);
-    if (repr.type == repr_type::quoted)
-    {
-        for (auto p { repr.string }; *p; ++p)
-        {
-            if (*p == repr.delim || *p == repr.escape)
-                oss << StreamCharType(repr.escape);
-            oss << StreamCharType(*p);
-        }
-    }
-    else
-    {
-        for (auto p { repr.string }; *p; ++p)
-            insert_escaped_char(oss, repr, *p);
-    }
-    oss << StreamCharType(repr.delim);
-    return ostream << oss.str();
-}
-
+/*
+ * @brief ostream operator for string representations
+ * @notes overloads as follows:
+ *   - default: handles (const) basic_string& and (const) basic_string_view&
+ *      represenations (potentially also (const) (CharT&)[] if not decayed?)
+ *   - single-char: handles (const) CharT& representations
+ *   - C string: handles (const) CharT* representations
+ */
 template<typename StreamCharType, typename StringType, typename StringCharType>
 auto operator<<(
     std::basic_ostream<StreamCharType>& ostream,
@@ -808,6 +765,74 @@ auto operator<<(
     return ostream << oss.str();
 }
 
+template <typename StreamCharType, typename CharType, typename StringCharType>
+auto operator<<(
+    std::basic_ostream<StreamCharType>& ostream,
+    const string_repr<CharType&, StringCharType>& repr
+    ) -> std::enable_if_t<
+    std::is_same<StringCharType, std::remove_const_t<CharType>>::value,
+    std::basic_ostream<StreamCharType>&>
+{
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
+    std::basic_ostringstream<StreamCharType> oss;
+    insert_literal_prefix<StreamCharType, StringCharType>(oss);
+    oss << StreamCharType(repr.delim);
+    if (repr.type == repr_type::quoted)
+    {
+        if (repr.string == repr.delim || repr.string == repr.escape)
+            oss << StreamCharType(repr.escape);
+        oss << StreamCharType(repr.string);
+    }
+    else
+        insert_escaped_char(oss, repr, repr.string);
+    oss << StreamCharType(repr.delim);
+    return ostream << oss.str();
+}
+
+template <typename StreamCharType, typename CharType, typename StringCharType>
+auto operator<<(
+    std::basic_ostream<StreamCharType>& ostream,
+    const string_repr<CharType*, StringCharType>& repr
+    ) -> std::enable_if_t<
+    std::is_same<StringCharType, std::remove_const_t<CharType>>::value,
+    std::basic_ostream<StreamCharType>&>
+{
+    if (repr.type == repr_type::quoted &&
+        sizeof(StreamCharType) < sizeof(StringCharType))
+    {
+        ostream.setstate(std::ios_base::failbit);
+        return ostream;
+    }
+    std::basic_ostringstream<StreamCharType> oss;
+    insert_literal_prefix<StreamCharType, StringCharType>(oss);
+    oss << StreamCharType(repr.delim);
+    if (repr.type == repr_type::quoted)
+    {
+        for (auto p { repr.string }; *p; ++p)
+        {
+            if (*p == repr.delim || *p == repr.escape)
+                oss << StreamCharType(repr.escape);
+            oss << StreamCharType(*p);
+        }
+    }
+    else
+    {
+        for (auto p { repr.string }; *p; ++p)
+            insert_escaped_char(oss, repr, *p);
+    }
+    oss << StreamCharType(repr.delim);
+    return ostream << oss.str();
+}
+
+/*
+ * @brief helper to extract_string_repr, decodes/validates a literal prefix
+ *   matching the target char type
+ */
 template<typename StreamCharType, typename StringCharType>
 static void extract_literal_prefix(
     std::basic_istream<StreamCharType>& istream)
@@ -832,17 +857,21 @@ static void extract_literal_prefix(
         istream.setstate(std::ios_base::failbit);
 }
 
+/*
+ * @brief helper to extract_string_repr, decodes a hex escaped value and
+ *   validates that it matches the width of the target char type
+ */
 template<typename StreamCharType, typename StringCharType>
 static int64_t extract_fixed_width_hex_value(
     std::basic_istream<StreamCharType>& istream)
 {
     static constexpr uint32_t hex_length { sizeof(StringCharType) * 2 };
+    // strtol expects char* (not using wcstol due to variable size of wchar_t)
     char buff[hex_length + 1] {};
-    // strtol expects char* and wcstol expects wchar_t*, which is variable size -
-    //   in either case, we can't rely on implicit casting with something like
-    //   `istream.get(buff, hex_length + 1);`, as malformed hex strings could
-    //   have values larger than StreamCharType max, with unpredictable overflows
     char *p { buff };
+    // malformed hex strings could have values larger than StreamCharType max,
+    //   with unpredictable overflows, so we need to pre-screen one by one
+    //   rather than just call `get(buff, hex_length + 1)`
     StreamCharType c;
     for (uint32_t i {}; istream.good() && i < hex_length; ++i, ++p)
     {
@@ -857,8 +886,12 @@ static int64_t extract_fixed_width_hex_value(
     return std::strtol(buff, nullptr, 16);
 }
 
+/*
+ * @brief helper to extract_string_repr, encapsulates main quoted representation
+ *   decoding loop
+ */
 template<typename StreamCharType, typename StringCharType>
-void extract_quoted_repr(
+static void extract_quoted_repr(
     std::basic_istream<StreamCharType>& istream,
     const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr,
     std::basic_string<StringCharType>& buffer)
@@ -889,8 +922,12 @@ void extract_quoted_repr(
     istream.setf(orig_flags);
 }
 
+/*
+ * @brief helper to extract_string_repr, encapsulates main literal
+ *   representation decoding loop
+ */
 template<typename StreamCharType, typename StringCharType>
-void extract_literal_repr(
+static void extract_literal_repr(
     std::basic_istream<StreamCharType>& istream,
     const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr,
     std::basic_string<StringCharType>& buffer)
@@ -943,8 +980,12 @@ void extract_literal_repr(
     istream.setf(orig_flags);
 }
 
+/*
+ * @brief helper to operator>>(string_repr), differentiates between quoted and
+ *   literal decoding
+ */
 template<typename StreamCharType, typename StringCharType>
-void extract_string_repr(
+static void extract_string_repr(
     std::basic_istream<StreamCharType>& istream,
     const string_repr<std::basic_string<StringCharType>&, StringCharType>& repr)
 {
@@ -958,7 +999,6 @@ void extract_string_repr(
         istream.setstate(std::ios_base::failbit);
         return;
     }
-    // !!? can we pass only StringCharType to template?
     extract_literal_prefix<StreamCharType, StringCharType>(istream);
     if (!istream.good())
         return;
@@ -976,6 +1016,12 @@ void extract_string_repr(
         repr.string = std::move(temp);
 }
 
+/*
+ * @brief istream operator for string representations
+ * @notes overloads as follows:
+ *   - CharT&
+ *   - basic_string&
+ */
 template<typename StreamCharType, typename StringCharType>
 auto operator>>(
     std::basic_istream<StreamCharType>& istream,
@@ -1005,57 +1051,65 @@ auto operator>>(
 
 }  // namespace detail
 
-// default is string literals, with most ASCII escapes plus hex escapes
-template<typename CharacterType, typename TraitsType>
-std::basic_ios<CharacterType, TraitsType>& literalrepr(
-    std::basic_ios<CharacterType, TraitsType>& stream)
+/*
+ * @brief iomanip to set encoding/decoding of strings/chars in containers to
+ *   literal
+ */
+template<typename CharType, typename TraitsType>
+std::basic_ios<CharType, TraitsType>& literalrepr(
+    std::basic_ios<CharType, TraitsType>& stream)
 {
     stream.iword(detail::get_manip_i()) =
         static_cast<int>(detail::repr_type::literal);
     return stream;
 }
 
-// only escape char and delimiter escaped
-template<typename CharacterType, typename TraitsType>
-std::basic_ios<CharacterType, TraitsType>& quotedrepr(
-    std::basic_ios<CharacterType, TraitsType>& stream)
+/*
+ * @brief iomanip to set encoding/decoding of strings/chars in containers to
+ *   quoted
+ */
+template<typename CharType, typename TraitsType>
+std::basic_ios<CharType, TraitsType>& quotedrepr(
+    std::basic_ios<CharType, TraitsType>& stream)
 {
     stream.iword(detail::get_manip_i()) =
         static_cast<int>(detail::repr_type::quoted);
     return stream;
 }
 
-/**
- * @brief Manipulator for quoted strings.
- * @param string String to quote.
- * @param delim  Character to quote string with.
- * @param escape Escape character to escape itself or quote character.
+/*
+ * @brief generates quoted string represenation intended for use with stream
+ *   operators
+ * @notes
+ *   - overloads need to be supplied for each string type of param `string`,
+ *       so that it can both be templated for any char type, and allow the
+ *       deduction of the `delim` and `escape` types when they are not given as
+ *       params
+ *   - overloads should support the following string types: (const) CharT&,
+ *       (const) CharT*, (const) basic_string&, (const) basic_string_view&
  */
-// it may seem verbose to have this full list of overloads, but given that
-//   delim and escape types need to be deducible from and match the char type
-//   in c/string, there are challenges in further template generalization
 template<typename CharType>
 inline auto quoted(
-    CharType& c,
+    CharType& string,
     CharType delim = CharType('\''), CharType escape = CharType('\\')
     ) -> std::enable_if_t<
         traits::is_char_type<CharType>::value,
         detail::string_repr<CharType&, CharType>>
 {
     return detail::string_repr<CharType&, CharType>(
-            c, delim, escape, detail::repr_type::quoted);
+            string, delim, escape, detail::repr_type::quoted);
 }
 
 template<typename CharType>
 inline auto quoted(
-    const CharType& c,
+    const CharType& string,
     CharType delim = CharType('\''), CharType escape = CharType('\\')
     ) -> std::enable_if_t<
         traits::is_char_type<CharType>::value,
         detail::string_repr<const CharType&, CharType>>
 {
     return detail::string_repr<const CharType&, CharType>(
-            c, delim, escape, detail::repr_type::quoted);
+            string, delim, escape, detail::repr_type::quoted);
 }
 
 template<typename CharType>
@@ -1128,28 +1182,39 @@ inline auto quoted(
 }
 #endif  // C++17
 
+/*
+ * @brief generates literal string represenation intended for use with stream
+ *   operators
+ * @notes
+ *   - overloads need to be supplied for each string type of param `string`,
+ *       so that it can both be templated for any char type, and allow the
+ *       deduction of the `delim` and `escape` types when they are not given as
+ *       params
+ *   - overloads should support the following string types: (const) CharT&,
+ *       (const) CharT*, (const) basic_string&, (const) basic_string_view&
+ */
 template<typename CharType>
 inline auto literal(
-    CharType& c,
+    CharType& string,
     CharType delim = CharType('\''), CharType escape = CharType('\\')
     ) -> std::enable_if_t<
         traits::is_char_type<CharType>::value,
         detail::string_repr<CharType&, CharType>>
 {
     return detail::string_repr<CharType&, CharType>(
-            c, delim, escape, detail::repr_type::literal);
+            string, delim, escape, detail::repr_type::literal);
 }
 
 template<typename CharType>
 inline auto literal(
-    const CharType& c,
+    const CharType& string,
     CharType delim = CharType('\''), CharType escape = CharType('\\')
     ) -> std::enable_if_t<
         traits::is_char_type<CharType>::value,
         detail::string_repr<const CharType&, CharType>>
 {
     return detail::string_repr<const CharType&, CharType>(
-            c, delim, escape, detail::repr_type::literal);
+            string, delim, escape, detail::repr_type::literal);
 }
 
 template<typename CharType>
