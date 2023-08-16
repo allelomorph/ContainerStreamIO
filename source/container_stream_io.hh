@@ -1289,90 +1289,91 @@ inline auto literal(
 
 }  // namespace strings
 
+/*
+ * @brief contains structures which provide tokens used around and between
+ *   elements in conatiner serializations
+ */
 namespace decorator {
 
-/**
- * @brief Struct to neatly wrap up all the additional characters we'll need in order to
- * print out the containers.
+/*
+ * @brief wraps tokens used around and between elements in serialization of a
+ *   given set of container types
  */
-template <typename CharacterType>
+template <typename CharType>
 struct delim_wrapper
 {
-    const CharacterType* prefix;
-    const CharacterType* separator;
-    const CharacterType* whitespace;
-    const CharacterType* suffix;
+    const CharType* prefix;
+    const CharType* separator;
+    const CharType* whitespace;
+    const CharType* suffix;
 };
 
 using namespace strings::compile_time;  // char_literal, string_literal
 
-/**
- * @brief Default for any container type that isn't even more specialized.
+// TBD consider making map/multimap curly braced, as they are essentially sets of pairs
+/*
+ * @brief wraps delim_wrapper, allowing templating by both char and container
+ *   types
+ * @notes overloads as follows:
+ *   - default (eg std::array, C array, vector, list, forward_list, queue,
+ *       unordered(multi)(map|set))
+ *   - set/multiset
+ *   - pair
+ *   - tuple
  */
-template <typename ContainerType, typename CharacterType>
+template <typename ContainerType,
+          typename CharType>
 struct delimiters
 {
-    static constexpr delim_wrapper<CharacterType> values {
-        STRING_LITERAL(CharacterType, "["),
-        STRING_LITERAL(CharacterType, ","),
-        STRING_LITERAL(CharacterType, " "),
-        STRING_LITERAL(CharacterType, "]") };
+    static constexpr delim_wrapper<CharType> values {
+        STRING_LITERAL(CharType, "["),
+        STRING_LITERAL(CharType, ","),
+        STRING_LITERAL(CharType, " "),
+        STRING_LITERAL(CharType, "]") };
 };
 
-/**
- * @brief Specialization for std::set<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType,
-          typename CharacterType>
-struct delimiters<std::set<DataType, ComparatorType, AllocatorType>, CharacterType>
+template <typename DataType, typename CompareType, typename AllocType,
+          typename CharType>
+struct delimiters<std::set<DataType, CompareType, AllocType>, CharType>
 {
-    static constexpr delim_wrapper<CharacterType> values {
-        STRING_LITERAL(CharacterType, "{"),
-        STRING_LITERAL(CharacterType, ","),
-        STRING_LITERAL(CharacterType, " "),
-        STRING_LITERAL(CharacterType, "}") };
+    static constexpr delim_wrapper<CharType> values {
+        STRING_LITERAL(CharType, "{"),
+        STRING_LITERAL(CharType, ","),
+        STRING_LITERAL(CharType, " "),
+        STRING_LITERAL(CharType, "}") };
 };
 
-/**
- * @brief Specialization for std::multiset<...> instances.
- */
-template <typename DataType, typename ComparatorType, typename AllocatorType,
-          typename CharacterType>
-struct delimiters<std::multiset<DataType, ComparatorType, AllocatorType>, CharacterType>
+template <typename DataType, typename CompareType, typename AllocType,
+          typename CharType>
+struct delimiters<std::multiset<DataType, CompareType, AllocType>, CharType>
 {
-    static constexpr delim_wrapper<CharacterType> values {
-        STRING_LITERAL(CharacterType, "{"),
-        STRING_LITERAL(CharacterType, ","),
-        STRING_LITERAL(CharacterType, " "),
-        STRING_LITERAL(CharacterType, "}") };
+    static constexpr delim_wrapper<CharType> values {
+        STRING_LITERAL(CharType, "{"),
+        STRING_LITERAL(CharType, ","),
+        STRING_LITERAL(CharType, " "),
+        STRING_LITERAL(CharType, "}") };
 };
 
-/**
- * @brief Specialization for std::pair<...> instances.
- */
 template <typename FirstType, typename SecondType,
-          typename CharacterType>
-struct delimiters<std::pair<FirstType, SecondType>, CharacterType>
+          typename CharType>
+struct delimiters<std::pair<FirstType, SecondType>, CharType>
 {
-    static constexpr delim_wrapper<CharacterType> values {
-        STRING_LITERAL(CharacterType, "("),
-        STRING_LITERAL(CharacterType, ","),
-        STRING_LITERAL(CharacterType, " "),
-        STRING_LITERAL(CharacterType, ")") };
+    static constexpr delim_wrapper<CharType> values {
+        STRING_LITERAL(CharType, "("),
+        STRING_LITERAL(CharType, ","),
+        STRING_LITERAL(CharType, " "),
+        STRING_LITERAL(CharType, ")") };
 };
 
-/**
- * @brief Specialization for std::tuple<...> instances.
- */
 template <typename... DataType,
-          typename CharacterType>
-struct delimiters<std::tuple<DataType...>, CharacterType>
+          typename CharType>
+struct delimiters<std::tuple<DataType...>, CharType>
 {
-    static constexpr delim_wrapper<CharacterType> values {
-        STRING_LITERAL(CharacterType, "<"),
-        STRING_LITERAL(CharacterType, ","),
-        STRING_LITERAL(CharacterType, " "),
-        STRING_LITERAL(CharacterType, ">") };
+    static constexpr delim_wrapper<CharType> values {
+        STRING_LITERAL(CharType, "<"),
+        STRING_LITERAL(CharType, ","),
+        STRING_LITERAL(CharType, " "),
+        STRING_LITERAL(CharType, ">") };
 };
 
 } // namespace decorator
