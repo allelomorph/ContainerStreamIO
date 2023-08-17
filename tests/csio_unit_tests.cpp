@@ -1713,7 +1713,82 @@ TEST_CASE("Printing/output streaming non-nested container types",
         REQUIRE(oss.str() == "[1, 2, 3, 4, 5]");
     }
 
-    SECTION("supports STL container")
+    SECTION("supports unpopulated STL container")
+    {
+        std::ostringstream oss;
+
+        SECTION("std::array")
+        {
+            std::array<int, 0> a;
+            oss << a;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::vector")
+        {
+            std::vector<int> v;
+            oss << v;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::tuple")
+        {
+            std::tuple<> t;
+            oss << t;
+            REQUIRE(oss.str() == "<>");
+        }
+
+        SECTION("std::deque")
+        {
+            std::deque<int> d;
+            oss << d;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::forward_list")
+        {
+            std::forward_list<int> fl;
+            oss << fl;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::list")
+        {
+            std::list<int> l;
+            oss << l;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::set")
+        {
+            std::set<int> s;
+            oss << s;
+            REQUIRE(oss.str() == "{}");
+        }
+
+        SECTION("std::multiset")
+        {
+            std::multiset<int> ms;
+            oss << ms;
+            REQUIRE(oss.str() == "{}");
+        }
+
+        SECTION("std::unordered_set")
+        {
+            std::unordered_set<int> us;
+            oss << us;
+            REQUIRE(oss.str() == "[]");
+        }
+
+        SECTION("std::unordered_multiset")
+        {
+            std::unordered_multiset<int> ums;
+            oss << ums;
+            REQUIRE(oss.str() == "[]");
+        }
+    }
+
+    SECTION("supports populated STL container")
     {
         std::ostringstream oss;
 
@@ -1921,7 +1996,92 @@ TEST_CASE("Parsing/input streaming non-nested container types",
         REQUIRE(a[2] == 3);
     }
 
-    SECTION("supports STL container")
+    SECTION("supports unpopulated STL container")
+    {
+        std::istringstream iss;
+
+        SECTION("std::array")
+        {
+            iss.str("[]");
+            std::array<int, 0> a;
+            iss >> a;
+            REQUIRE(a == std::array<int, 0>{});
+        }
+
+        SECTION("std::vector")
+        {
+            iss.str("[]");
+            std::vector<int> v;
+            iss >> v;
+            REQUIRE(v == std::vector<int>{});
+        }
+
+        SECTION("std::tuple")
+        {
+            iss.str("<>");
+            std::tuple<> t;
+            iss >> t;
+            REQUIRE(t == std::tuple<>{});
+        }
+
+        SECTION("std::deque")
+        {
+            iss.str("[]");
+            std::deque<int> d;
+            iss >> d;
+            REQUIRE(d == std::deque<int>{});
+        }
+
+        SECTION("std::forward_list")
+        {
+            iss.str("[]");
+            std::forward_list<int> fl;
+            iss >> fl;
+            REQUIRE(fl == std::forward_list<int>{});
+        }
+
+        SECTION("std::list")
+        {
+            iss.str("[]");
+            std::list<int> l;
+            iss >> l;
+            REQUIRE(l == std::list<int>{});
+        }
+
+        SECTION("std::set")
+        {
+            iss.str("{}");
+            std::set<int> s;
+            iss >> s;
+            REQUIRE(s == std::set<int>{});
+        }
+
+        SECTION("std::multiset")
+        {
+            iss.str("{}");
+            std::multiset<int> ms;
+            iss >> ms;
+            REQUIRE(ms == std::multiset<int>{});
+        }
+
+        SECTION("std::unordered_set")
+        {
+            iss.str("[]");
+            std::unordered_set<int> us;
+            iss >> us;
+            REQUIRE(us == std::unordered_set<int>{});
+        }
+
+        SECTION("std::unordered_multiset")
+        {
+            iss.str("[]");
+            std::unordered_multiset<int> ums;
+            iss >> ums;
+            REQUIRE(ums == std::unordered_multiset<int>{});
+        }
+    }
+
+    SECTION("supports populated STL container")
     {
         std::istringstream iss;
 
@@ -2131,7 +2291,113 @@ TEST_CASE("Supported container types should not change after being encoded and "
           "then decoded",
           "[output][input]")
 {
-    SECTION("when non-nested")
+    SECTION("when unpopulated non-nested")
+    {
+        std::stringstream ss;
+
+        SECTION("std::array")
+        {
+            std::array<int, 0> a;
+            ss << a;
+            std::array<int, 0> _a;
+            ss >>_a;
+            REQUIRE(_a == a);
+        }
+
+        SECTION("std::vector")
+        {
+            std::vector<int> v;
+            ss << v;
+            std::vector<int> _v;
+            ss >>_v;
+            REQUIRE(_v == v);
+        }
+
+        SECTION("std::tuple")
+        {
+            std::tuple<> t;
+            ss << t;
+            std::tuple<> _t;
+            ss >> _t;
+            REQUIRE(_t == t);
+        }
+
+        SECTION("std::deque")
+        {
+            std::deque<int> d;
+            ss << d;
+            std::deque<int> _d;
+            ss >> _d;
+            REQUIRE(_d == d);
+        }
+
+        SECTION("std::forward_list")
+        {
+            std::forward_list<int> fl;
+            ss << fl;
+            std::forward_list<int> _fl;
+            ss >> _fl;
+            REQUIRE(_fl == fl);
+        }
+
+        SECTION("std::list")
+        {
+            std::list<int> l;
+            ss << l;
+            std::list<int> _l;
+            ss >> _l;
+            REQUIRE(_l == l);
+        }
+
+        SECTION("std::set")
+        {
+            std::set<int> s;
+            ss << s;
+            std::set<int> _s;
+            ss >> _s;
+            REQUIRE(_s == s);
+        }
+
+        SECTION("std::multiset")
+        {
+            std::multiset<int> ms;
+            ss << ms;
+            std::multiset<int> _ms;
+            ss >> _ms;
+            REQUIRE(_ms == ms);
+        }
+
+        SECTION("std::unordered_set")
+        {
+            std::unordered_set<int> us;
+            ss << us;
+            std::unordered_set<int> _us;
+            ss >> _us;
+            REQUIRE(_us == us);
+        }
+
+        SECTION("std::unordered_multiset")
+        {
+            std::unordered_multiset<int> ums;
+            ss << ums;
+            std::unordered_multiset<int> _ums;
+            ss >> _ums;
+            REQUIRE(_ums == ums);
+        }
+
+        SECTION("iterable custom container class",
+                "(iterable being defiend as having members (typename)iterator, "
+                "begin(), end(), and empty())")
+        {
+            vector_wrapper<int> vr;
+            ss << vr;
+            vector_wrapper<int> _vr;
+            ss >> _vr;
+            REQUIRE(_vr == vr);
+        }
+    }
+
+    SECTION("when populated non-nested")
     {
         std::stringstream ss;
 
@@ -2361,7 +2627,7 @@ TEST_CASE("Printing with custom formatter",
             REQUIRE(woss.str() == L"$$ 1 | 2 | 3 | 4 $$");
         }
 
-        SECTION("std::tuple<>")
+        SECTION("std::tuple")
         {
             const auto container { std::tuple<int, double, short>{ 1, 1.5, 2 } };
             container_stream_io::output::to_stream(
