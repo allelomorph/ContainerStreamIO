@@ -4,6 +4,7 @@
 #include <algorithm>    // copy find_if for_each (limits:numeric_limits)
 #include <cstddef>      // size_t
 #include <iostream>
+#include <sstream>      // basic_ostringstream
 #include <set>
 #include <map>
 #include <string>
