@@ -359,7 +359,7 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
     return ArraySize == 0;
 }
 
-} // namespace traits
+}  // namespace traits
 
 /*
  * @brief contains resources for string encoding/decoding
@@ -552,7 +552,7 @@ constexpr auto string_literal(
 
 #endif
 
-} // namespace compile_time
+}  // namespace compile_time
 
 /*
  * @brief implementation details for quoted/literal
@@ -1376,22 +1376,32 @@ struct delimiters<std::tuple<DataType...>, CharType>
         STRING_LITERAL(CharType, ">") };
 };
 
-} // namespace decorator
+}  // namespace decorator
 
+/*
+ * @brief contains functions to govern input streaming/extraction of compatible
+ *   containers
+ */
 namespace input {
 
+/*
+ * @brief wraps functions for the parsing of decorators and elements in a
+ *   container serialization
+ */
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
     using repr_type = strings::detail::repr_type;
     using stream_char_type = typename StreamType::char_type;
 
-    static constexpr auto decorators = container_stream_io::decorator::delimiters<
-        ContainerType, stream_char_type>::values;
+    static constexpr auto decorators {
+        container_stream_io::decorator::delimiters<
+        ContainerType, stream_char_type>::values };
 
-    // attempts extraction of exact token
-    static void extract_token(
-        StreamType& istream, const stream_char_type* token)
+    /*
+     * brief attempts stream extraction of an exact token
+     */
+    static void extract_token(StreamType& istream, const stream_char_type* token)
     {
         if (token == nullptr)
         {
@@ -1417,11 +1427,22 @@ struct default_formatter
             istream.setstate(std::ios_base::failbit);
     }
 
+    /*
+     * @brief extracts prefix decorator from stream
+     */
     static void parse_prefix(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.prefix);
     }
 
+    /*
+     * @brief extracts element from stream
+     * @notes overloads as follows:
+     *   - default
+     *   - CharT&
+     *   - (CharT&)[] (invoked in case of nested C arrays, eg CharT[][])
+     *   - basic_string&
+     */
     template<typename ElementType>
     static auto parse_element(StreamType& istream, ElementType& element
         ) noexcept -> std::enable_if_t<
@@ -1444,23 +1465,6 @@ struct default_formatter
             istream >> std::ws >> strings::literal(element);
     }
 
-    template<typename CharType>
-    static void parse_element(StreamType& istream,
-                              std::basic_string<CharType>& element)
-    {
-        if (static_cast<repr_type>(
-                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
-            istream >> std::ws >> strings::quoted(element);
-        else
-            istream >> std::ws >> strings::literal(element);
-    }
-
-    // TBD std::cin >> charT[n] works, but with stack smashing on buffer overrun,
-    //   std::cin >> charT* works, but with segfault on nullptr or buffer overrun -
-    //   should this overload and one for charT* be allowed? If so, support for
-    //   charT[n] and char* should be moved into quoted()/literal(), to make for
-    //   consistent formatting inside and outside supported containers.
-    // Needed for case of nested char arrays (eg char[][])
     template <typename CharType, std::size_t ArraySize>
     static auto parse_element(
         StreamType& istream, CharType (&element)[ArraySize]
@@ -1485,21 +1489,39 @@ struct default_formatter
         }
     }
 
-    // !!! should not stream into a string_view, as it could be equivalent to
-    //   a CharType* of unknown allocation
+    template<typename CharType>
+    static void parse_element(StreamType& istream,
+                              std::basic_string<CharType>& element)
+    {
+        if (static_cast<repr_type>(
+                istream.iword(strings::detail::get_manip_i())) == repr_type::quoted)
+            istream >> std::ws >> strings::quoted(element);
+        else
+            istream >> std::ws >> strings::literal(element);
+    }
 
+    /*
+     * @brief extracts separator decorator from stream
+     */
     static void parse_separator(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.separator);
     }
 
+    /*
+     * @brief extracts suffix decorator from stream
+     */
     static void parse_suffix(StreamType& istream) noexcept
     {
         extract_token(istream, decorators.suffix);
     }
 };
 
-// move-assignable (all STL containers (including std::array))
+/*
+ * @brief helper to array_from_stream and from_stream overloads, used to move
+ *   elements which themselves may be nested containers with C arrays at some
+ *   level of nesting
+ */
 template<typename ContainerType>
 static auto c_array_compatible_move_assignment(ContainerType& source,
                                                ContainerType& target
@@ -1523,10 +1545,11 @@ static void c_array_compatible_move_assignment(ElementType (&source)[ArraySize],
     }
 }
 
-// tried enable_if with SFINAE struct is_array which would be true for std::array
-//   and C arrays, but it appeared that the resolution of is_array caused the
-//   decay of the C arrays to pointers, so they would then not be recognized as
-//   T[N] by the time they were used in from_stream overload resolution
+// TBD can the relevant from_stream overloads be combined instead with a SFINAE
+//   struct is_array, while not letting CharT[] types decay to CharT*?
+/*
+ * @brief wraps logic for C array and std::array overloads of from_stream
+ */
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& array_from_stream(
     StreamType& istream, ContainerType& container,
@@ -1566,14 +1589,17 @@ static StreamType& array_from_stream(
     }
 
     formatter.parse_suffix(istream);  // fails if serialization too long
-    // TBD this can be changed to if (is.good()) as eofbit should not be set until consuming past last char in stream
-    if (!istream.bad() && !istream.fail())
+    if (istream.good())
         c_array_compatible_move_assignment(temp_container, container);
     return istream;
 }
 
-/**
- * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
+/*
+ * @brief helper to from_stream(tuple), recursive struct meant to unpack and
+ *   parse std::tuple elements
+ * @notes overloads as follows:
+ *   - default
+ *   - last element in tuple
  */
 template <typename TupleType, std::size_t Index, std::size_t Last>
 struct tuple_handler
@@ -1591,10 +1617,6 @@ struct tuple_handler
     }
 };
 
-/**
- * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
- * object.
- */
 template <typename TupleType, std::size_t Index>
 struct tuple_handler<TupleType, Index, Index>
 {
@@ -1607,22 +1629,16 @@ struct tuple_handler<TupleType, Index, Index>
     }
 };
 
-/**
- * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
+/*
+ * @brief helper to default from_stream overload, uses appropriate emplacement
+ *   method based on container type
+ * @notes overloads as follows:
+ *   - emplace_back (preferred over other emplace methods)
+ *   - no emplace_back, but emplace (no const iterator needed) available
+ *   - emplace (no const iterator needed) available, elements are std::pair with
+ *       const .first (used for std::(unordered_)(multi)(set|map), where const
+ *       pair.first makes elements non-move-assignable)
  */
-template <typename TupleType>
-struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
-{
-    template <typename StreamType, typename FormatterType>
-    static void parse(
-        StreamType& /*istream*/, const TupleType& /*tuple*/,
-        const FormatterType& /*formatter*/) noexcept
-    {}
-};
-
-// no need to test is_move_assignable here if is_parseable_as_container tests
-//   containers for is_move_constructible
-// std::vector, std::deque, std::list
 template<typename ContainerType, typename ElementType>
 static auto emplace_element(ContainerType& container, const ElementType& element
     ) noexcept -> std::enable_if_t<
@@ -1632,21 +1648,6 @@ static auto emplace_element(ContainerType& container, const ElementType& element
     container.emplace_back(element);
 }
 
-// need this overload due to const keys making set/map pairs non-move-assignable
-// std::(unordered_)set (redundant keys ignored)
-// std::(unordered_)map (redundant keys will have value of first appearance in serialization)
-// std::(unordered_)multiset, std::(unordered_)multimap
-template <typename ContainerType, typename KeyType, typename ValueType>
-static auto emplace_element(ContainerType& container,
-                            const std::pair<const KeyType, ValueType>& element
-    ) noexcept -> std::enable_if_t<
-        traits::has_iterless_emplace<ContainerType>::value,
-        void>
-{
-    container.emplace(element.first, element.second);
-}
-
-// !!? now this is the intended generic
 template <typename ContainerType, typename ElementType>
 static auto emplace_element(ContainerType& container, const ElementType& element
     ) noexcept -> std::enable_if_t<
@@ -1657,6 +1658,30 @@ static auto emplace_element(ContainerType& container, const ElementType& element
     container.emplace(element);
 }
 
+template <typename ContainerType, typename KeyType, typename ValueType>
+static auto emplace_element(ContainerType& container,
+                            const std::pair<const KeyType, ValueType>& element
+    ) noexcept -> std::enable_if_t<
+        traits::has_iterless_emplace<ContainerType>::value,
+        void>
+{
+    container.emplace(element.first, element.second);
+}
+
+/*
+ * @brief stream extraction of compatible container type
+ * @notes overloads as follows:
+ *   - C array
+ *   - std::array
+ *   - std::tuple<T...>
+ *   - std::tuple<>
+ *   - std::pair
+ *   - std::forward_list: unique overload required due to forward_list not
+ *       having emplace(_back) or an easy way to get an iterator to the last
+ *       element (end(), but no --it)
+ *   - default: intended for "iterable" STL containers (see
+ *       traits::is_parseable_as_container)
+ */
 template <typename ElementType, std::size_t ArraySize,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -1675,9 +1700,6 @@ static StreamType& from_stream(
     return array_from_stream(istream, container, formatter);
 }
 
-/**
- * @brief Overload to deal with std::tuple<...> objects.
- */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& from_stream(
     StreamType& istream, std::tuple<TupleArgs...>& container,
@@ -1687,15 +1709,27 @@ static StreamType& from_stream(
 
     ContainerType temp;
     formatter.parse_prefix(istream);
-    container_stream_io::input::tuple_handler<
-        ContainerType, 0, sizeof...(TupleArgs) - 1>::parse(istream, temp, formatter);
+    tuple_handler<ContainerType, 0, sizeof...(TupleArgs) - 1
+                  >::parse(istream, temp, formatter);
     formatter.parse_suffix(istream);
-    if (!istream.fail() && !istream.bad())
+    // C arrays not allowed as STL container members due to non-move-
+    //   constructiblity, so no need for c_array_compatible_move_assignment
+    if (istream.good())
         container = std::move(temp);
     return istream;
 }
 
-// std::pairs, including map elements
+template <typename StreamType, typename FormatterType>
+static StreamType& from_stream(
+    StreamType& istream, std::tuple<>& /*container*/,
+    const FormatterType& formatter)
+{
+    // no contents to parse, only checks if prefix or suffix properly encoded
+    formatter.parse_prefix(istream);
+    formatter.parse_suffix(istream);
+    return istream;
+}
+
 template <typename FirstType, typename SecondType,
           typename StreamType, typename FormatterType>
 static StreamType& from_stream(
@@ -1706,8 +1740,8 @@ static StreamType& from_stream(
     if (!istream.good())
         return istream;
 
-    // pairs are commonly encounted as key-value members of (unordered_)(multi)maps,
-    //   in which case keys are const regardless of key type named in map instantiation
+    // pairs are commonly encountered as elements of std::(unordered_)(multi)(sets|map)s,
+    //   in which case keys are const regardless of key type passed to container template
     using BaseFirstType = typename std::remove_const<FirstType>::type;
     BaseFirstType first;
     SecondType second;
@@ -1728,15 +1762,14 @@ static StreamType& from_stream(
     if (istream.bad() || istream.fail())
         return istream;
 
-    c_array_compatible_move_assignment(first, const_cast<BaseFirstType&>(container.first));
-    c_array_compatible_move_assignment(second, container.second);
+    // C arrays not allowed as STL container members due to non-move-
+    //   constructiblity, so no need for c_array_compatible_move_assignment
+    const_cast<BaseFirstType&>(container.first) = std::move(first);
+    container.second = std::move(second);
 
     return istream;
 }
 
-// std::forward_list requires unique overload due to only having emplace_(after|front),
-//   no easy way to get iterator to last element (end(), but no --it,)
-//   plus its iterators not being affeced by new emplacements
 template <typename StreamType, typename ElementType, typename FormatterType>
 static StreamType& from_stream(
     StreamType& istream, std::forward_list<ElementType>& container,
@@ -1765,6 +1798,8 @@ static StreamType& from_stream(
     if (!istream.good())
         return istream;
     new_container.emplace_after(nc_it, temp_elem);
+    // forward_list iterators are not affected by new emplacements, therefore
+    //   nc_it can continue to be used as indicating position before last element
     ++nc_it;
 
     while (!istream.eof()) {
@@ -1788,13 +1823,14 @@ static StreamType& from_stream(
         ++nc_it;
     }
 
-    if (!istream.fail() && !istream.bad())
+    // C arrays not allowed as STL container members due to non-move-
+    //   constructiblity, so no need for c_array_compatible_move_assignment
+    if (istream.good())
         container = std::move(new_container);
     return istream;
 }
 
 // TBD use of clear could be avoided with container = ContainerType{}
-// "generic" overload, but requires value_type, clear(), move assignment of container and elements
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& from_stream(
     StreamType& istream, ContainerType& container,
@@ -1843,12 +1879,14 @@ static StreamType& from_stream(
         emplace_element(new_container, temp_elem);
     }
 
-    if (!istream.fail() && !istream.bad())
+    // C arrays not allowed as STL container members due to non-move-
+    //   constructiblity, so no need for c_array_compatible_move_assignment
+    if (istream.good())
         container = std::move(new_container);
     return istream;
 }
 
-} // namespace input
+}  // namespace input
 
 namespace output {
 
@@ -2020,9 +2058,9 @@ static StreamType& to_stream(
     return ostream;
 }
 
-} // namespace output
+}  // namespace output
 
-} // namespace container_stream_io
+}  // namespace container_stream_io
 
 /**
  * @brief Overload of the stream output operator for compatible containers.
