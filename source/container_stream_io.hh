@@ -1385,7 +1385,7 @@ struct delimiters<std::tuple<DataType...>, CharType>
 namespace input {
 
 /*
- * @brief wraps functions for the parsing of decorators and elements in a
+ * @brief default formatter for the parsing of decorators and elements in a
  *   container serialization
  */
 template <typename ContainerType, typename StreamType>
@@ -1395,8 +1395,7 @@ struct default_formatter
     using stream_char_type = typename StreamType::char_type;
 
     static constexpr auto decorators {
-        container_stream_io::decorator::delimiters<
-        ContainerType, stream_char_type>::values };
+        decorator::delimiters<ContainerType, stream_char_type>::values };
 
     /*
      * brief attempts stream extraction of an exact token
@@ -1888,25 +1887,38 @@ static StreamType& from_stream(
 
 }  // namespace input
 
+/*
+ * @brief contains functions to govern output streaming/insertion of compatible
+ *   containers
+ */
 namespace output {
 
-/**
- * @brief Default container formatter that will be used to print prefix,
- * element, separator, and suffix strings to an output stream.
+/*
+ * @brief default formatter for the printing of decorators and elements in a
+ *   container serialization
  */
 template <typename ContainerType, typename StreamType>
 struct default_formatter
 {
-    static constexpr auto decorators = container_stream_io::decorator::delimiters<
-        ContainerType, typename StreamType::char_type>::values;
+    static constexpr auto decorators {
+        decorator::delimiters<ContainerType, typename StreamType::char_type>::values };
 
     using repr_type = strings::detail::repr_type;
 
+    /*
+     * @brief inserts prefix decorator in stream
+     */
     static void print_prefix(StreamType& ostream) noexcept
     {
         ostream << decorators.prefix;
     }
 
+    /*
+     * @brief inserts element in stream
+     * @notes overloads as follows:
+     *   - default
+     *   - char or string types (C or STL)
+     */
     template <typename ElementType>
     static auto print_element(StreamType& ostream, const ElementType& element
         ) noexcept -> std::enable_if_t<
@@ -1931,19 +1943,29 @@ struct default_formatter
             ostream << strings::literal(element);
     }
 
+    /*
+     * @brief inserts separator and whitespace decorators in stream
+     */
     static void print_separator(StreamType& ostream) noexcept
     {
         ostream << decorators.separator << decorators.whitespace;
     }
 
+    /*
+     * @brief inserts suffix decorator in stream
+     */
     static void print_suffix(StreamType& ostream) noexcept
     {
         ostream << decorators.suffix;
     }
 };
 
-/**
- * @brief Recursive tuple handler struct meant to unpack and print std::tuple<...> elements.
+/*
+ * @brief helper to to_stream(tuple), recursive struct meant to unpack and
+ *   parse std::tuple elements
+ * @notes overloads as follows:
+ *   - default
+ *   - last element in tuple
  */
 template <typename TupleType, std::size_t Index, std::size_t Last>
 struct tuple_handler
@@ -1958,10 +1980,6 @@ struct tuple_handler
     }
 };
 
-/**
- * @brief Specialization of tuple handler to deal with the last element in the std::tuple<...>
- * object.
- */
 template <typename TupleType, std::size_t Index>
 struct tuple_handler<TupleType, Index, Index>
 {
@@ -1973,21 +1991,14 @@ struct tuple_handler<TupleType, Index, Index>
     }
 };
 
-/**
- * @brief Specialization of tuple handler to deal with empty std::tuple<...> objects.
- */
-template <typename TupleType>
-struct tuple_handler<TupleType, 0, std::numeric_limits<std::size_t>::max()>
-{
-    template <typename StreamType, typename FormatterType>
-    static void print(
-        StreamType& /*ostream*/, const TupleType& /*tuple*/,
-        const FormatterType& /*formatter*/) noexcept
-    {}
-};
-
-/**
- * @brief Overload to deal with std::tuple<...> objects.
+/*
+ * @brief stream insertion of compatible container type
+ * @notes overloads as follows:
+ *   - std::tuple<T...>
+ *   - std::tuple<>
+ *   - std::pair
+ *   - default: intended for "iterable" STL containers (see
+ *       traits::is_printable_as_container)
  */
 template <typename StreamType, typename FormatterType, typename... TupleArgs>
 static StreamType& to_stream(
@@ -2004,9 +2015,16 @@ static StreamType& to_stream(
     return ostream;
 }
 
-/**
- * @brief Overload to handle std::pair<...> objects.
- */
+template <typename StreamType, typename FormatterType, typename... TupleArgs>
+static StreamType& to_stream(
+    StreamType& ostream, const std::tuple<>& /*tuple*/,
+    const FormatterType& formatter)
+{
+    formatter.print_prefix(ostream);
+    formatter.print_suffix(ostream);
+    return ostream;
+}
+
 template <typename FirstType, typename SecondType, typename StreamType, typename FormatterType>
 static StreamType& to_stream(
     StreamType& ostream, const std::pair<FirstType, SecondType>& container,
@@ -2021,10 +2039,6 @@ static StreamType& to_stream(
     return ostream;
 }
 
-/**
- * @brief Overload to handle containers that support the notion of "emptiness,"
- * and forward-iterability.
- */
 template <typename ContainerType, typename StreamType, typename FormatterType>
 static StreamType& to_stream(
     StreamType& ostream, const ContainerType& container,
@@ -2063,34 +2077,12 @@ static StreamType& to_stream(
 }  // namespace container_stream_io
 
 /**
- * @brief Overload of the stream output operator for compatible containers.
+ * @brief istream operator overload for compatible containers
  */
 template <typename ContainerType, typename StreamType>
-auto operator<<(StreamType& ostream, const ContainerType& container) -> std::enable_if_t<
-#ifdef __cpp_variable_templates
-    container_stream_io::traits::is_printable_as_container_v<ContainerType>,
-#else
-    container_stream_io::traits::is_printable_as_container<ContainerType>::value,
-#endif
-    StreamType&>
-{
-    using formatter_type =
-        container_stream_io::output::default_formatter<ContainerType, StreamType>;
-    container_stream_io::output::to_stream(ostream, container, formatter_type{});
-
-    return ostream;
-}
-
-/**
- * @brief Overload of the stream output operator for compatible containers.
- */
-template <typename ContainerType, typename StreamType>
-auto operator>>(StreamType& istream, ContainerType& container) -> std::enable_if_t<
-#ifdef __cpp_variable_templates
-    container_stream_io::traits::is_parseable_as_container_v<ContainerType>,
-#else
+auto operator>>(StreamType& istream, ContainerType& container
+    ) -> std::enable_if_t<
     container_stream_io::traits::is_parseable_as_container<ContainerType>::value,
-#endif
     StreamType&>
 {
     using formatter_type =
@@ -2098,4 +2090,20 @@ auto operator>>(StreamType& istream, ContainerType& container) -> std::enable_if
     container_stream_io::input::from_stream(istream, container, formatter_type{});
 
     return istream;
+}
+
+/*
+ * @brief ostream operator overload for compatible containers
+ */
+template <typename ContainerType, typename StreamType>
+auto operator<<(StreamType& ostream, const ContainerType& container
+    ) -> std::enable_if_t<
+    container_stream_io::traits::is_printable_as_container<ContainerType>::value,
+    StreamType&>
+{
+    using formatter_type =
+        container_stream_io::output::default_formatter<ContainerType, StreamType>;
+    container_stream_io::output::to_stream(ostream, container, formatter_type{});
+
+    return ostream;
 }
