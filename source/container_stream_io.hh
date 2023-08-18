@@ -19,6 +19,9 @@
 #error "container_stream_io only supports C++11 and above"
 #endif  // pre-C++11
 
+/**
+ * @brief manually adding to std STL elements from later standards when needed
+ */
 namespace std {
 
 #if (__cplusplus < 201402L)
@@ -49,16 +52,18 @@ using void_t = void;
 
 }  // namespace std
 
-
+/**
+ * @brief contains supporting logic for implementation of istream and ostream
+ *   operators for compatible containers
+ */
 namespace container_stream_io {
 
-/*
- * @brief contains templates to use in resolution of other template functions
- *   and classes
+/**
+ * @brief contains type traits tests to use in template resolution
  */
 namespace traits {
 
-/*
+/**
  * @brief tests for character types
  */
 template <typename Type>
@@ -106,7 +111,7 @@ struct is_c_string_type<CharType[ArraySize]> :
                                   is_char_type<std::remove_const_t<CharType>>::value>
 {};
 
-/*
+/**
  * @brief tests for STL string types
  */
 template <typename Type>
@@ -127,7 +132,7 @@ struct is_stl_string_type<std::basic_string_view<CharType>> :
 
 #endif  // C++17 and above
 
-/*
+/**
  * @brief tests for character type pointers and C arrays, plus STL string types
  */
 template <typename StringType>
@@ -137,7 +142,7 @@ struct is_string_type :
                                   is_stl_string_type<StringType>::value>
 {};
 
-/*
+/**
  * @brief tests for member function emplace(const_iterator, args...), eg as
  *   found in std::vector, std::list, std::deque
  * @notes
@@ -155,7 +160,7 @@ struct has_emplace<
     : public std::true_type
 {};
 
-/*
+/**
  * @brief tests for member function emplace(args...) (no iterator required), eg
  *   as found in std::(unordered_)(multi)set, std::(unordered_)(multi)map
  */
@@ -168,7 +173,7 @@ struct has_iterless_emplace<Type, std::void_t<decltype(std::declval<Type>().empl
     : public std::true_type
 {};
 
-/*
+/**
  * @brief tests for member function emplace_back(args...) (no iterator required),
  *   eg as found in std::vector, std::list, std::deque
  */
@@ -181,7 +186,7 @@ struct has_emplace_back<Type, std::void_t<decltype(std::declval<Type>().emplace_
     : public std::true_type
 {};
 
-/*
+/**
  * @brief tests for member function emplace_after(const iterator, args...),
  *   eg as found in std::forward_list
  */
@@ -196,7 +201,7 @@ struct has_emplace_after<
     : public std::true_type
 {};
 
-/*
+/**
  * @brief tests for presence of some emplacement member function that can be
  *   used during container extraction from istreams
  */
@@ -207,7 +212,7 @@ struct supports_element_emplacement : public std::integral_constant<
     has_emplace_back<Type>::value || has_emplace_after<Type>::value>
 {};
 
-/*
+/**
  * @brief tests for class compatibility with container istreaming
  * @notes overloads should behave as follows:
  *   - base case: all incompatible types excluded
@@ -271,7 +276,7 @@ template <typename Type>
 constexpr bool is_parseable_as_container_v = is_parseable_as_container<Type>::value;
 
 #endif
-/*
+/**
  * @brief tests for class compatibility with container ostreaming
  * @notes overloads should behave as follows:
  *   - base case: all incompatible types excluded
@@ -362,12 +367,12 @@ constexpr bool is_empty(const ArrayType (&)[ArraySize]) noexcept
 
 }  // namespace traits
 
-/*
+/**
  * @brief contains resources for string encoding/decoding
  */
 namespace strings {
 
-/*
+/**
  * @brief contains implementation of macros which generate compile-time string
  *   or character literals templated by character type
  * @notes adapted from: https://stackoverflow.com/a/60770220
@@ -376,7 +381,7 @@ namespace compile_time {
 
 #if (__cplusplus >= 201703L)
 
-/*
+/**
  * @brief C++17 implementation of CHAR_LITERAL
  */
 template <typename CharType>
@@ -398,7 +403,7 @@ constexpr const CharType char_literal(
     else if constexpr( std::is_same_v<CharType, char32_t> )  return u32c;
 }
 
-/*
+/**
  * @brief C++17 implementation of STRING_LITERAL
  */
 template <typename CharType,
@@ -436,7 +441,7 @@ constexpr auto string_literal(
 
 #else // __cplusplus < 201703L
 
-/*
+/**
  * @brief C++11 implementation of CHAR_LITERAL
  * @notes constepxr functions implicitly inline per C++11 standard:
  *   https://stackoverflow.com/a/14391320
@@ -473,7 +478,7 @@ constexpr char32_t char_literal(
     return u32c;
 }
 
-/*
+/**
  * @brief C++11 implementation of STRING_LITERAL
  * @notes partial function template specialization not allowed by standard, see:
  *   https://stackoverflow.com/a/21218271, so instead using overloads each
@@ -555,7 +560,7 @@ constexpr auto string_literal(
 
 }  // namespace compile_time
 
-/*
+/**
  * @brief implementation details for quoted/literal
  * @notes quoted/literal implementation (string_repr, operator<</>>(string_repr),
  *   quoted(), literal()) is based on GNU ISO C++14 std::quoted (as seen in
@@ -564,12 +569,12 @@ constexpr auto string_literal(
  */
 namespace detail {
 
-/*
+/**
  * @brief labels for string representation type flag values
  */
 enum class repr_type { literal, quoted };
 
-/*
+/**
  * @brief stream index getter for use with iword/pword to set literalrepr/quotedrepr
  */
 static inline int get_manip_i()
@@ -578,7 +583,7 @@ static inline int get_manip_i()
     return i;
 }
 
-/*
+/**
  * @brief string representation, contains data necessary to istream/ostream a
  *   a quoted/literal string encoding
  */
@@ -586,7 +591,7 @@ template <typename StringType, typename CharType>
 struct string_repr
 {
 private:
-    /*
+    /**
      * @brief contains standard ascii escape sequences, mapped both by value and
      *   by escape symbol
      * @notes
@@ -636,7 +641,7 @@ public:
 
 #if (__cplusplus < 201703L)
 
-/*
+/**
  * linker needs declaration of static constexpr members outside class for
  *   standards below C++17, see:
  *   - https://en.cppreference.com/w/cpp/language/static
@@ -665,7 +670,7 @@ std::map<CharType, CharType> string_repr<StringType, CharType>::ascii_escapes::b
     }
 };
 
-/*
+/**
  * @brief helper to operator<<(string_repr), ostreams literal prefix
  */
 template <typename StreamCharType, typename StringCharType>
@@ -685,7 +690,7 @@ static void insert_literal_prefix(
         os << CHAR_LITERAL(StreamCharType, 'U');
 }
 
-/*
+/**
  * @brief helper to operator<<(string_repr), ostreams one character from a
  *   string representation
  */
@@ -723,7 +728,7 @@ static void insert_escaped_char(
 }
 
 // TBD maybe throw exeception rather than set failbit on quoted char size failure?
-/*
+/**
  * @brief ostream operator for string representations
  * @notes overloads as follows:
  *   - default: handles (const) basic_string& and (const) basic_string_view&
@@ -830,7 +835,7 @@ auto operator<<(
     return ostream << oss.str();
 }
 
-/*
+/**
  * @brief helper to extract_string_repr, decodes/validates a literal prefix
  *   matching the target char type
  */
@@ -858,7 +863,7 @@ static void extract_literal_prefix(
         istream.setstate(std::ios_base::failbit);
 }
 
-/*
+/**
  * @brief helper to extract_string_repr, decodes a hex escaped value and
  *   validates that it matches the width of the target char type
  */
@@ -887,7 +892,7 @@ static int64_t extract_fixed_width_hex_value(
     return std::strtol(buff, nullptr, 16);
 }
 
-/*
+/**
  * @brief helper to extract_string_repr, encapsulates main quoted representation
  *   decoding loop
  */
@@ -923,7 +928,7 @@ static void extract_quoted_repr(
     istream.setf(orig_flags);
 }
 
-/*
+/**
  * @brief helper to extract_string_repr, encapsulates main literal
  *   representation decoding loop
  */
@@ -981,7 +986,7 @@ static void extract_literal_repr(
     istream.setf(orig_flags);
 }
 
-/*
+/**
  * @brief helper to operator>>(string_repr), differentiates between quoted and
  *   literal decoding
  */
@@ -1017,7 +1022,7 @@ static void extract_string_repr(
         repr.string = std::move(temp);
 }
 
-/*
+/**
  * @brief istream operator for string representations
  * @notes overloads as follows:
  *   - CharT&
@@ -1052,7 +1057,7 @@ auto operator>>(
 
 }  // namespace detail
 
-/*
+/**
  * @brief iomanip to set encoding/decoding of strings/chars in containers to
  *   literal
  */
@@ -1065,7 +1070,7 @@ std::basic_ios<CharType, TraitsType>& literalrepr(
     return stream;
 }
 
-/*
+/**
  * @brief iomanip to set encoding/decoding of strings/chars in containers to
  *   quoted
  */
@@ -1078,7 +1083,7 @@ std::basic_ios<CharType, TraitsType>& quotedrepr(
     return stream;
 }
 
-/*
+/**
  * @brief generates quoted string represenation intended for use with stream
  *   operators
  * @notes
@@ -1183,7 +1188,7 @@ inline auto quoted(
 }
 #endif  // C++17
 
-/*
+/**
  * @brief generates literal string represenation intended for use with stream
  *   operators
  * @notes
@@ -1290,13 +1295,13 @@ inline auto literal(
 
 }  // namespace strings
 
-/*
+/**
  * @brief contains structures which provide tokens used around and between
  *   elements in conatiner serializations
  */
 namespace decorator {
 
-/*
+/**
  * @brief wraps tokens used around and between elements in serialization of a
  *   given set of container types
  */
@@ -1312,7 +1317,7 @@ struct delim_wrapper
 using namespace strings::compile_time;  // char_literal, string_literal
 
 // TBD consider making map/multimap curly braced, as they are essentially sets of pairs
-/*
+/**
  * @brief wraps delim_wrapper, allowing templating by both char and container
  *   types
  * @notes overloads as follows:
@@ -1379,13 +1384,13 @@ struct delimiters<std::tuple<DataType...>, CharType>
 
 }  // namespace decorator
 
-/*
+/**
  * @brief contains functions to govern input streaming/extraction of compatible
  *   containers
  */
 namespace input {
 
-/*
+/**
  * @brief default formatter for the parsing of decorators and elements in a
  *   container serialization
  */
@@ -1398,8 +1403,8 @@ struct default_formatter
     static constexpr auto decorators {
         decorator::delimiters<ContainerType, stream_char_type>::values };
 
-    /*
-     * brief attempts stream extraction of an exact token
+    /**
+     * @brief attempts stream extraction of an exact token
      */
     static void extract_token(StreamType& istream, const stream_char_type* token)
     {
@@ -1427,7 +1432,7 @@ struct default_formatter
             istream.setstate(std::ios_base::failbit);
     }
 
-    /*
+    /**
      * @brief extracts prefix decorator from stream
      */
     static void parse_prefix(StreamType& istream) noexcept
@@ -1435,7 +1440,7 @@ struct default_formatter
         extract_token(istream, decorators.prefix);
     }
 
-    /*
+    /**
      * @brief extracts element from stream
      * @notes overloads as follows:
      *   - default
@@ -1500,7 +1505,7 @@ struct default_formatter
             istream >> std::ws >> strings::literal(element);
     }
 
-    /*
+    /**
      * @brief extracts separator decorator from stream
      */
     static void parse_separator(StreamType& istream) noexcept
@@ -1508,7 +1513,7 @@ struct default_formatter
         extract_token(istream, decorators.separator);
     }
 
-    /*
+    /**
      * @brief extracts suffix decorator from stream
      */
     static void parse_suffix(StreamType& istream) noexcept
@@ -1517,7 +1522,7 @@ struct default_formatter
     }
 };
 
-/*
+/**
  * @brief helper to array_from_stream and from_stream overloads, used to move
  *   elements which themselves may be nested containers with C arrays at some
  *   level of nesting
@@ -1547,7 +1552,7 @@ static void c_array_compatible_move_assignment(ElementType (&source)[ArraySize],
 
 // TBD can the relevant from_stream overloads be combined instead with a SFINAE
 //   struct is_array, while not letting CharT[] types decay to CharT*?
-/*
+/**
  * @brief wraps logic for C array and std::array overloads of from_stream
  */
 template <typename ContainerType, typename StreamType, typename FormatterType>
@@ -1594,7 +1599,7 @@ static StreamType& array_from_stream(
     return istream;
 }
 
-/*
+/**
  * @brief helper to from_stream(tuple), recursive struct meant to unpack and
  *   parse std::tuple elements
  * @notes overloads as follows:
@@ -1629,7 +1634,7 @@ struct tuple_handler<TupleType, Index, Index>
     }
 };
 
-/*
+/**
  * @brief helper to default from_stream overload, uses appropriate emplacement
  *   method based on container type
  * @notes overloads as follows:
@@ -1668,7 +1673,7 @@ static auto emplace_element(ContainerType& container,
     container.emplace(element.first, element.second);
 }
 
-/*
+/**
  * @brief stream extraction of compatible container type
  * @notes overloads as follows:
  *   - C array
@@ -1888,13 +1893,13 @@ static StreamType& from_stream(
 
 }  // namespace input
 
-/*
+/**
  * @brief contains functions to govern output streaming/insertion of compatible
  *   containers
  */
 namespace output {
 
-/*
+/**
  * @brief default formatter for the printing of decorators and elements in a
  *   container serialization
  */
@@ -1906,7 +1911,7 @@ struct default_formatter
 
     using repr_type = strings::detail::repr_type;
 
-    /*
+    /**
      * @brief inserts prefix decorator in stream
      */
     static void print_prefix(StreamType& ostream) noexcept
@@ -1914,7 +1919,7 @@ struct default_formatter
         ostream << decorators.prefix;
     }
 
-    /*
+    /**
      * @brief inserts element in stream
      * @notes overloads as follows:
      *   - default
@@ -1944,7 +1949,7 @@ struct default_formatter
             ostream << strings::literal(element);
     }
 
-    /*
+    /**
      * @brief inserts separator and whitespace decorators in stream
      */
     static void print_separator(StreamType& ostream) noexcept
@@ -1952,7 +1957,7 @@ struct default_formatter
         ostream << decorators.separator << decorators.whitespace;
     }
 
-    /*
+    /**
      * @brief inserts suffix decorator in stream
      */
     static void print_suffix(StreamType& ostream) noexcept
@@ -1961,7 +1966,7 @@ struct default_formatter
     }
 };
 
-/*
+/**
  * @brief helper to to_stream(tuple), recursive struct meant to unpack and
  *   parse std::tuple elements
  * @notes overloads as follows:
@@ -1992,7 +1997,7 @@ struct tuple_handler<TupleType, Index, Index>
     }
 };
 
-/*
+/**
  * @brief stream insertion of compatible container type
  * @notes overloads as follows:
  *   - std::tuple<T...>
@@ -2093,7 +2098,7 @@ auto operator>>(StreamType& istream, ContainerType& container
     return istream;
 }
 
-/*
+/**
  * @brief ostream operator overload for compatible containers
  */
 template <typename ContainerType, typename StreamType>
