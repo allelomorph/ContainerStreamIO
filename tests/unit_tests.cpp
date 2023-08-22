@@ -82,9 +82,13 @@ inline bool idiomatic_strcmp(
     return s1 == s2;
 }
 
+// member functions must be const, as the formatter is passed by const& to
+//   (to|from)_stream, which is called directly (rather than stream operators)
+//   when using a custom formatter
 struct custom_formatter
 {
-    template <typename StreamType> void print_prefix(StreamType& stream) const noexcept
+    template <typename StreamType>
+    void print_prefix(StreamType& stream) const noexcept
     {
         stream << L"$$ ";
     }
@@ -95,12 +99,14 @@ struct custom_formatter
         stream << element;
     }
 
-    template <typename StreamType> void print_separator(StreamType& stream) const noexcept
+    template <typename StreamType>
+    void print_separator(StreamType& stream) const noexcept
     {
         stream << L" | ";
     }
 
-    template <typename StreamType> void print_suffix(StreamType& stream) const noexcept
+    template <typename StreamType>
+    void print_suffix(StreamType& stream) const noexcept
     {
         stream << L" $$";
     }

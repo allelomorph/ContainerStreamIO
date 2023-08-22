@@ -160,31 +160,31 @@ As an example, here's a very simple custom formatter (limited to wide character 
 struct custom_formatter
 {
     template <typename StreamType>
-    static void print_prefix(StreamType& stream) noexcept
+    void print_prefix(StreamType& stream) const noexcept
     {
         stream << L"$$ ";
     }
 
     template <typename StreamType, typename ElementType>
-    static void print_element(StreamType& stream, const ElementType& element) noexcept
+    void print_element(StreamType& stream, const ElementType& element) const noexcept
     {
         stream << element;
     }
 
     template <typename StreamType>
-    static void print_delimiter(StreamType& stream) noexcept
+    void print_separator(StreamType& stream) const noexcept
     {
         stream << L" | ";
     }
 
     template <typename StreamType>
-    static void print_suffix(StreamType& stream) noexcept
+    void print_suffix(StreamType& stream) const noexcept
     {
         stream << L" $$";
     }
 };
 ```
-Such a formatter might be used like so:
+Using a custom formatter requires calling `to_stream`/`from_stream` directly (rather than using the stream operators, which invoke the default formatter):
 ```C++
 std::vector<int> v { 1, 2, 3, 4 };
 container_printer::to_stream(std::wcout, v, custom_formatter{});
@@ -193,7 +193,9 @@ printing to wcout:
 ```
 $$ 1 | 2 | 3 | 4 $$
 ```
-Note that by templating the individual functions in the `custom_formatter`, instead of the struct as a whole, we can allow the compiler to deduce all the necessary template arguments for us at the call-site. This prevents the need for template arguments for every instantiation of `custom_formatter`.
+Two items to note in the above example formatter struct:
+* member functions must be const as a consequence of calling `to_stream`/`from_stream` directly
+* templating the member functions instead of the struct as a whole allows for parameter deduction at the call-site, preventing the need for template arguments for every struct instantiation
 
 ## Usage
 All that's required is inclusion of `container_printer.hh` in the relevant source of your project.
