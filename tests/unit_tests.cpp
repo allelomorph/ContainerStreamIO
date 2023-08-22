@@ -51,33 +51,33 @@ using common_str_type = typename std::common_type<std::basic_string<CharT>>::typ
 #endif
 
 inline bool idiomatic_strcmp(
-    const common_str_type<char> s1, const common_str_type<char> s2)
+    const common_str_type<char>& s1, const common_str_type<char>& s2)
 {
     return s1 == s2;
 }
 
 inline bool idiomatic_strcmp(
-    const common_str_type<wchar_t> s1, const common_str_type<wchar_t> s2)
+    const common_str_type<wchar_t>& s1, const common_str_type<wchar_t>& s2)
 {
     return s1 == s2;
 }
 
 #if __cplusplus > 201703L
 inline bool idiomatic_strcmp(
-    const common_str_type<char8_t> s1, const common_str_type<char8_t> s2)
+    const common_str_type<char8_t>& s1, const common_str_type<char8_t>& s2)
 {
     return s1 == s2;
 }
 #endif
 
 inline bool idiomatic_strcmp(
-    const common_str_type<char16_t> s1, const common_str_type<char16_t> s2)
+    const common_str_type<char16_t>& s1, const common_str_type<char16_t>& s2)
 {
     return s1 == s2;
 }
 
 inline bool idiomatic_strcmp(
-    const common_str_type<char32_t> s1, const common_str_type<char32_t> s2)
+    const common_str_type<char32_t>& s1, const common_str_type<char32_t>& s2)
 {
     return s1 == s2;
 }
