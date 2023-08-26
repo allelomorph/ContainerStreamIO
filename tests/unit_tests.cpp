@@ -1,6 +1,17 @@
-// requires CATCH_CONFIG_MAIN to be defined in separate translation unit that
-//   also includes catch.hpp
-#include "catch.hpp"
+#if (__cplusplus < 201103L)
+  #error "unit_tests.cpp only supports C++11 and above"
+#endif
+
+#if (_CATCH_VERSION_MAJOR == 3)
+  #include "catch2/catch_version_macros.hpp"               // CATCH_VERSION_MAJOR
+  #include "catch2/catch_test_macros.hpp"                  // TEST_CASE, SECTION, REQUIRE
+  #include "catch2/matchers/catch_matchers.hpp"            // REQUIRES_THROWS_MATCHES
+  #include "catch2/matchers/catch_matchers_exception.hpp"  // Catch::Matchers::Message
+#elif (_CATCH_VERSION_MAJOR == 2)
+  #include "catch2/catch.hpp"
+#else
+  #error "_CATCH_VERSION_MAJOR must be defined as 2 or 3"
+#endif
 
 #include "container_stream_io.hh"
 
@@ -20,10 +31,6 @@
 #include <stack>
 #include <queue>
 #include <sstream>
-
-#if (__cplusplus < 201103L)
-#error "csio_unit_tests.cpp only supports C++11 and above"
-#endif  // pre-C++11
 
 namespace
 {
@@ -535,6 +542,12 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
 
         SECTION("but enforces encoding by throwing exception for")
         {
+#if (CATCH_VERSION_MAJOR > 2)
+            using Catch::Matchers::Message;
+#else
+            using Catch::Message;
+#endif
+
             SECTION("unprintable 7-bit ASCII values")
             {
                 SECTION("used as delimiter")
@@ -542,7 +555,7 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         oss << strings::literal('\t', '\v'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
 
@@ -551,7 +564,7 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         oss << strings::literal('\t', '\'', '\v'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
             }
@@ -563,7 +576,7 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         oss << strings::literal('\t', '\x80'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
 
@@ -572,7 +585,7 @@ TEST_CASE("strings::literal() printing/output streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         oss << strings::literal('\t', '\'', '\x80'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
             }
@@ -758,6 +771,12 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
 
         SECTION("but enforces encoding by throwing exception for")
         {
+#if (CATCH_VERSION_MAJOR > 2)
+            using Catch::Matchers::Message;
+#else
+            using Catch::Message;
+#endif
+
             SECTION("unprintable 7-bit ASCII values")
             {
                 SECTION("used as delimiter")
@@ -765,7 +784,7 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         iss >> strings::literal(c, '\v'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
 
@@ -774,7 +793,7 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         iss >> strings::literal(c, '\'', '\v'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
             }
@@ -786,7 +805,7 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         iss >> strings::literal(c, '\x80'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
 
@@ -795,7 +814,7 @@ TEST_CASE("strings::literal() parsing/input streaming escaped literals",
                     REQUIRE_THROWS_MATCHES(
                         iss >> strings::literal(c, '\'', '\x80'),
                         std::invalid_argument,
-                        Catch::Message(
+                        Message(
                             "literal delim and escape must be printable 7-bit ASCII characters"));
                 }
             }
