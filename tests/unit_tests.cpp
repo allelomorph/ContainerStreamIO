@@ -2689,7 +2689,7 @@ TEST_CASE("Printing with custom formatter",
 TEST_CASE("Exploring edge cases for nested containers",
           "[output][input]")
 {
-    SECTION("when istreaming into nestings c arrays and/or std::array:",
+    SECTION("when istreaming into nestings mixing c arrays and std::array:",
             "(tests array_from_stream and relevant from_stream overloads)")
     {
         std::stringstream ss;
