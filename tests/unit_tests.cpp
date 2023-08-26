@@ -1,3 +1,19 @@
+/*
+ * @file unit testing of container_stream_io.hh using Catch2
+ *
+ * "Catch2 v2" assumes v2.13.10 182c910b4b63ff587a3440e08f84f70497e49a81
+ * "Catch2 v3" assumes v3.4.0   6e79e682b726f524310d55dec8ddac4e9c52fb5f
+ *
+ * Requires Catch2 main to be compiled and linked either from:
+ * - Catch2 v2 header only/unbuilt:
+ *     includes/catch_with_main.hpp (manually compiled)
+ * - Catch2 v2 built with cmake CACHE entry CATCH_BUILD_STATIC_LIBRARY=ON
+ *     (use `-D CATCH_BUILD_STATIC_LIBRARY=ON` at config time):
+ *     libCatch2WithMain.a
+ * - Catch2 v3 standard build (static library by default):
+ *     libCatch2Main.a
+ */
+
 #if (__cplusplus < 201103L)
   #error "unit_tests.cpp only supports C++11 and above"
 #endif
