@@ -214,7 +214,7 @@ TEST_CASE("Traits: detect emplace methods",
     REQUIRE(traits::has_emplace_after<std::vector<int>>::value    == false);
 
     REQUIRE(traits::has_iterless_emplace<std::set<int>>::value == true);
-    REQUIRE(traits::has_emplace<std::set<int>>::value          == false);
+    REQUIRE(traits::has_emplace<std::set<int>>::value          == true);
     REQUIRE(traits::has_emplace_back<std::set<int>>::value     == false);
     REQUIRE(traits::has_emplace_after<std::set<int>>::value    == false);
 
