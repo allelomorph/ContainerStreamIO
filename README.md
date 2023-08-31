@@ -1,5 +1,5 @@
 # Container Stream I/O
-A header-only solution to enable both input and output streaming of various Standard Library data structures. Based on [Tim Severeijns' Container Printer](https://github.com/TimSevereijns/ContainerPrinter).
+A header-only solution to enable both input and output streaming of various Standard Library data structures. Inspired by and originally a fork of [Tim Severeijns' Container Printer](https://github.com/TimSevereijns/ContainerPrinter).
 
 ## Goals
 Originally:
